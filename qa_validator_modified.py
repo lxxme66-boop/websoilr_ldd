@@ -147,7 +147,6 @@ class LocalKGQAValidator:
             'passed': 0,
             'failed': 0,  # 修复：添加failed键
             'failed_by_reason': {
-                'document': 0,
                 'common_sense': 0,
                 'principle': 0,
                 'incomplete_question': 0
@@ -284,7 +283,6 @@ class LocalKGQAValidator:
         except Exception as e:
             logger.error(f"本地模型验证失败: {str(e)}")
             return {
-                'document_based': False,
                 'common_sense': False,
                 'principle_correct': False,
                 'overall_valid': False,
@@ -322,15 +320,11 @@ class LocalKGQAValidator:
 问题: {qa_pair['question'][:500]}
 答案: {qa_pair['answer'][:500]}
 
-请从三个方面验证：
-1. 文档验证：问题和答案是否有文档支撑？(有实体是本文相关就可以)
-2. 常识验证：问题和答案是否符合技术常识？
-3. 原理验证：问题和答案是否符合科学原理？
+请从两个方面验证：
+1. 常识验证：问题和答案是否符合技术常识？
+2. 原理验证：问题和答案是否符合科学原理？
 
 输出格式：
-文档验证: 通过/不通过
-理由: xxx
-
 常识验证: 通过/不通过
 理由: xxx
 
@@ -447,7 +441,6 @@ class LocalKGQAValidator:
     def _parse_validation_response(self, response: str) -> Dict:
         """解析验证响应"""
         result = {
-            'document_based': False,
             'common_sense': False,
             'principle_correct': False,
             'overall_valid': False,
@@ -458,14 +451,8 @@ class LocalKGQAValidator:
         
         for i, line in enumerate(lines):
             line = line.strip()
-            
-            if '文档验证' in line:
-                result['document_based'] = '通过' in line and '不通过' not in line
-                # 查找理由
-                if i + 1 < len(lines) and '理由' in lines[i + 1]:
-                    result['details']['document_reason'] = lines[i + 1].split(':', 1)[-1].strip()
                     
-            elif '常识验证' in line:
+            if '常识验证' in line:
                 result['common_sense'] = '通过' in line and '不通过' not in line
                 if i + 1 < len(lines) and '理由' in lines[i + 1]:
                     result['details']['common_sense_reason'] = lines[i + 1].split(':', 1)[-1].strip()
@@ -478,7 +465,7 @@ class LocalKGQAValidator:
             elif '总体判断' in line:
                 result['overall_valid'] = '通过' in line and '不通过' not in line
         
-        # 如果没有总体判断，基于常识和原理结果（移除文档验证要求）
+        # 如果没有总体判断，基于常识和原理结果
         if not any('总体判断' in line for line in lines):
             result['overall_valid'] = all([
                 result['common_sense'],
@@ -500,8 +487,6 @@ class LocalKGQAValidator:
             return
         
         validation = qa_pair['validation']
-        if not validation.get('document_based', False):
-            statistics['failed_by_reason']['document'] += 1
         if not validation.get('common_sense', False):
             statistics['failed_by_reason']['common_sense'] += 1
         if not validation.get('principle_correct', False):
