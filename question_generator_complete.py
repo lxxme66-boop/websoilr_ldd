@@ -34,14 +34,31 @@ class QuestionGenerator:
         self.complexity_levels = self.qg_config.get('complexity_levels', {})
         self.language_patterns = self.qg_config.get('language_patterns', {})
         
-        # 新增：问题类型比例控制
+        # 新增：问题类型比例控制（优化版）
         self.question_type_ratios = self.qg_config.get('question_type_ratios', {
             'factual': 0.25,      # 25% 事实型
-            'comparison': 0.20,   # 20% 比较型  
+            'comparison': 0.18,   # 18% 比较型  
             'reasoning': 0.25,    # 25% 推理型
             'multi_hop': 0.15,    # 15% 多跳型
-            'open_ended': 0.15    # 15% 开放型
+            'open_ended': 0.17    # 17% 开放型（提高开放型问题比例）
         })
+        
+        # 新增：问题类型优先级配置
+        self.question_type_priorities = self.qg_config.get('question_type_priorities', {
+            'open_ended': 1,      # 最高优先级：开放型问题
+            'reasoning': 2,       # 高优先级：推理型问题
+            'factual': 3,         # 中等优先级：事实型问题
+            'comparison': 4,      # 较低优先级：比较型问题
+            'multi_hop': 5        # 最低优先级：多跳型问题
+        })
+        
+        # 新增：动态比例调整参数
+        self.dynamic_ratio_adjustment = {
+            'enable': True,               # 启用动态调整
+            'adjustment_factor': 0.1,     # 调整因子
+            'min_ratio_threshold': 0.05,  # 最小比例阈值
+            'max_ratio_threshold': 0.4    # 最大比例阈值
+        }
         
         # 加载QA生成模型
         self._load_qa_generator()
@@ -178,24 +195,44 @@ class QuestionGenerator:
             # 新增：开放型问题模板
             'open_ended': {
                 'zh_cn': [
+                    # 用户指定的固定开放型问题
                     "怎么实现短沟道的顶栅氧化物TFT器件且同时避免器件失效？",
                     "金属氧化物背板在短时间内驱动OLED显示时会出现残影，请问如何在TFT方面改善残影问题？",
+                    
+                    # 扩展的开放型问题模板
                     "在{technology}技术发展过程中，面临的主要挑战是什么？应该如何系统性地解决这些问题？",
                     "针对{problem_scenario}，从技术创新、工艺优化、成本控制等多个维度，应该制定怎样的综合解决方案？",
                     "如何在{constraint_condition}的限制下，实现{target_goal}的同时保证{quality_requirement}？",
                     "在{application_domain}领域，{technology_type}技术的未来发展趋势如何？可能面临哪些技术瓶颈和突破点？",
                     "当{failure_mode}发生时，如何建立系统性的故障诊断和预防体系？",
-                    "在{manufacturing_process}中，如何平衡产品性能、生产效率和质量稳定性之间的关系？"
+                    "在{manufacturing_process}中，如何平衡产品性能、生产效率和质量稳定性之间的关系？",
+                    
+                    # 新增：更多TCL特定的开放型问题
+                    "在薄膜晶体管制造过程中，如何优化栅极介电层的厚度和材料选择以提高器件可靠性？",
+                    "面对显示面板功耗和亮度的矛盾需求，应该从哪些技术路径寻求突破？",
+                    "在大尺寸OLED面板生产中，如何解决均匀性和良率之间的平衡问题？",
+                    "针对柔性显示技术，在保持显示性能的同时如何提高机械可靠性？",
+                    "在高分辨率显示驱动中，如何解决信号完整性和EMI问题？"
                 ],
                 'en': [
+                    # User-specified fixed open-ended questions  
                     "How to implement short-channel top-gate oxide TFT devices while avoiding device failure?",
                     "Metal oxide backplanes show image retention when driving OLED displays for short periods. How can this ghosting issue be improved from the TFT perspective?",
+                    
+                    # Extended open-ended question templates
                     "What are the main challenges in the development of {technology} technology? How should these problems be systematically addressed?",
                     "For {problem_scenario}, what comprehensive solution should be developed from multiple dimensions including technological innovation, process optimization, and cost control?",
                     "How to achieve {target_goal} while ensuring {quality_requirement} under the constraints of {constraint_condition}?",
                     "In the {application_domain} field, what are the future development trends of {technology_type} technology? What technical bottlenecks and breakthrough points might be encountered?",
                     "When {failure_mode} occurs, how to establish a systematic fault diagnosis and prevention system?",
-                    "In {manufacturing_process}, how to balance the relationship between product performance, production efficiency, and quality stability?"
+                    "In {manufacturing_process}, how to balance the relationship between product performance, production efficiency, and quality stability?",
+                    
+                    # New: More TCL-specific open-ended questions
+                    "In thin-film transistor manufacturing, how to optimize gate dielectric layer thickness and material selection to improve device reliability?",
+                    "Facing the conflicting demands of display panel power consumption and brightness, from which technical paths should breakthroughs be sought?",
+                    "In large-size OLED panel production, how to solve the balance between uniformity and yield?",
+                    "For flexible display technology, how to improve mechanical reliability while maintaining display performance?",
+                    "In high-resolution display driving, how to solve signal integrity and EMI issues?"
                 ]
             }
         }
@@ -303,10 +340,16 @@ class QuestionGenerator:
             q_type = qa.get('type', 'unknown').split('_')[0]
             final_type_distribution[q_type] = final_type_distribution.get(q_type, 0) + 1
         
+        # 生成详细统计报告
+        stats_report = self._generate_detailed_stats_report(
+            filtered_qa, final_type_distribution, type_targets, len(subgraphs), valid_subgraphs
+        )
+        
         logger.info(f"问题生成完成: 处理了 {len(subgraphs)} 个子图, "
                    f"其中 {valid_subgraphs} 个有效, "
                    f"生成了 {len(filtered_qa)} 个高质量QA对")
         logger.info(f"最终问题类型分布: {final_type_distribution}")
+        logger.info(f"详细统计报告:\n{stats_report}")
         
         return filtered_qa  # 返回过滤后的结果
 
@@ -331,35 +374,84 @@ class QuestionGenerator:
     def _select_question_types_by_ratio(self, current_counters: Dict[str, int], 
                                       targets: Dict[str, int], 
                                       num_nodes: int, num_edges: int) -> List[str]:
-        """根据当前计数和目标比例选择要生成的问题类型"""
+        """根据当前计数和目标比例选择要生成的问题类型（增强版）"""
         selected_types = []
         
-        # 计算每种类型的缺口
-        type_gaps = {}
+        # 计算每种类型的缺口和优先级得分
+        type_scores = {}
         for q_type in self.question_types:
             current = current_counters.get(q_type, 0)
             target = targets.get(q_type, 0)
             gap = max(0, target - current)
-            type_gaps[q_type] = gap
+            
+            # 计算优先级得分（缺口越大，优先级越高，得分越高）
+            priority = self.question_type_priorities.get(q_type, 5)
+            priority_score = (6 - priority) * 10  # 转换为正向得分
+            
+            # 计算比例偏差得分
+            if target > 0:
+                current_ratio = current / max(1, sum(current_counters.values()))
+                target_ratio = self.question_type_ratios.get(q_type, 0)
+                ratio_deviation = max(0, target_ratio - current_ratio)
+                ratio_score = ratio_deviation * 100
+            else:
+                ratio_score = 0
+            
+            # 综合得分：缺口权重50% + 优先级权重30% + 比例偏差权重20%
+            total_score = gap * 0.5 + priority_score * 0.3 + ratio_score * 0.2
+            type_scores[q_type] = {
+                'score': total_score,
+                'gap': gap,
+                'priority': priority,
+                'suitable': self._is_question_type_suitable(q_type, num_nodes, num_edges)
+            }
         
-        # 按缺口大小排序，优先选择缺口大的类型
-        sorted_types = sorted(type_gaps.items(), key=lambda x: x[1], reverse=True)
+        # 过滤掉不适合的类型
+        suitable_types = {k: v for k, v in type_scores.items() if v['suitable']}
         
-        # 选择前2-3个类型（根据子图复杂度）
-        max_types = min(3, max(1, num_edges // 2))
-        for q_type, gap in sorted_types[:max_types]:
-            if gap > 0 and self._is_question_type_suitable(q_type, num_nodes, num_edges):
+        if not suitable_types:
+            logger.warning("没有适合当前子图的问题类型")
+            return []
+        
+        # 按综合得分排序
+        sorted_types = sorted(suitable_types.items(), key=lambda x: x[1]['score'], reverse=True)
+        
+        # 智能选择类型数量
+        max_types = self._calculate_max_types_for_subgraph(num_nodes, num_edges)
+        
+        # 确保开放型问题有机会被选中（如果适合且有缺口）
+        open_ended_info = suitable_types.get('open_ended')
+        if open_ended_info and open_ended_info['gap'] > 0:
+            if 'open_ended' not in [t[0] for t in sorted_types[:max_types]]:
+                # 如果开放型问题不在前max_types中，但有缺口，则替换最后一个
+                if len(sorted_types) >= max_types:
+                    sorted_types = sorted_types[:max_types-1] + [('open_ended', open_ended_info)]
+        
+        # 选择前N个类型
+        for q_type, info in sorted_types[:max_types]:
+            if info['gap'] > 0:  # 只选择有缺口的类型
                 selected_types.append(q_type)
         
-        # 如果没有选中任何类型，至少选择一个适合的类型
-        if not selected_types:
-            for q_type in self.question_types:
-                if self._is_question_type_suitable(q_type, num_nodes, num_edges):
-                    selected_types.append(q_type)
-                    break
+        # 如果没有选中任何类型，至少选择一个得分最高的适合类型
+        if not selected_types and suitable_types:
+            best_type = max(suitable_types.items(), key=lambda x: x[1]['score'])[0]
+            selected_types.append(best_type)
         
-        logger.debug(f"选择的问题类型: {selected_types}, 当前计数: {current_counters}, 目标: {targets}")
+        logger.debug(f"选择的问题类型: {selected_types}")
+        logger.debug(f"类型得分详情: {[(t, f'{info['score']:.1f}(gap:{info['gap']},pri:{info['priority']})') for t, info in sorted_types[:5]]}")
+        
         return selected_types
+
+    def _calculate_max_types_for_subgraph(self, num_nodes: int, num_edges: int) -> int:
+        """根据子图复杂度计算最大问题类型数量"""
+        if num_nodes <= 2 or num_edges <= 1:
+            return 1
+        elif num_nodes <= 4 or num_edges <= 3:
+            return 2
+        elif num_nodes <= 8 or num_edges <= 6:
+            return 3
+        else:
+            return 4  # 复杂子图最多4种类型
 
     def _generate_open_ended_questions(self, subgraph: nx.DiGraph, 
                                      features: Dict, lang: str) -> List[Dict]:
@@ -382,15 +474,25 @@ class QuestionGenerator:
         # === 第一部分：固定开放型问题 (30%) ===
         template_qa_pairs = []
         if template_count > 0:
-            # 使用预定义的开放型问题
+            # 使用预定义的开放型问题（包括用户指定的问题）
             fixed_questions = [
                 "怎么实现短沟道的顶栅氧化物TFT器件且同时避免器件失效？",
-                "金属氧化物背板在短时间内驱动OLED显示时会出现残影，请问如何在TFT方面改善残影问题？"
+                "金属氧化物背板在短时间内驱动OLED显示时会出现残影，请问如何在TFT方面改善残影问题？",
+                "在薄膜晶体管制造过程中，如何优化栅极介电层的厚度和材料选择以提高器件可靠性？",
+                "面对显示面板功耗和亮度的矛盾需求，应该从哪些技术路径寻求突破？",
+                "在大尺寸OLED面板生产中，如何解决均匀性和良率之间的平衡问题？",
+                "针对柔性显示技术，在保持显示性能的同时如何提高机械可靠性？",
+                "在高分辨率显示驱动中，如何解决信号完整性和EMI问题？"
             ]
             
-            for i, question in enumerate(fixed_questions[:template_count]):
+            # 智能选择固定问题（基于子图上下文）
+            selected_fixed_questions = self._select_relevant_fixed_questions(
+                fixed_questions, subgraph, tech_context, template_count
+            )
+            
+            for i, question in enumerate(selected_fixed_questions):
                 try:
-                    # 根据子图上下文调整问题
+                    # 根据子图上下文调整问题（轻微调整以适应上下文）
                     contextualized_question = self._contextualize_open_question(
                         question, subgraph, tech_context
                     )
@@ -406,7 +508,8 @@ class QuestionGenerator:
                             'type': 'open_ended_template',
                             'language': lang,
                             'tech_context': tech_context,
-                            'generation_method': 'template'
+                            'generation_method': 'template',
+                            'question_category': self._categorize_open_question(contextualized_question)
                         })
                         
                 except Exception as e:
@@ -545,6 +648,88 @@ class QuestionGenerator:
             context['technical_domain'] = 'manufacturing_process'
         
         return context
+
+    def _select_relevant_fixed_questions(self, fixed_questions: List[str], subgraph: nx.DiGraph, 
+                                        tech_context: Dict, target_count: int) -> List[str]:
+        """智能选择与子图上下文相关的固定开放型问题"""
+        relevant_questions = []
+        
+        # 分析子图中的技术领域特征
+        has_display_tech = any('display' in str(node).lower() or 'oled' in str(node).lower() 
+                              for node in subgraph.nodes())
+        has_semiconductor_tech = any('tft' in str(node).lower() or 'semiconductor' in str(node).lower() 
+                                    for node in subgraph.nodes())
+        has_manufacturing = any('manufacturing' in str(node).lower() or 'process' in str(node).lower() 
+                               for node in subgraph.nodes())
+        
+        # 基于技术领域特征选择相关问题
+        for question in fixed_questions:
+            question_lower = question.lower()
+            relevance_score = 0
+            
+            # TFT/半导体相关问题
+            if ('tft' in question_lower or '半导体' in question_lower or '器件' in question_lower):
+                if has_semiconductor_tech:
+                    relevance_score += 3
+                else:
+                    relevance_score += 1
+            
+            # OLED/显示相关问题  
+            if ('oled' in question_lower or '显示' in question_lower or '面板' in question_lower):
+                if has_display_tech:
+                    relevance_score += 3
+                else:
+                    relevance_score += 1
+            
+            # 制造工艺相关问题
+            if ('制造' in question_lower or '工艺' in question_lower or '生产' in question_lower):
+                if has_manufacturing:
+                    relevance_score += 2
+                else:
+                    relevance_score += 1
+            
+            # 通用技术问题（总是有一定相关性）
+            if relevance_score == 0:
+                relevance_score = 1
+                
+            relevant_questions.append((question, relevance_score))
+        
+        # 按相关性排序并选择
+        relevant_questions.sort(key=lambda x: x[1], reverse=True)
+        selected = [q[0] for q in relevant_questions[:target_count]]
+        
+        logger.debug(f"选择的固定开放型问题: {[q[:30]+'...' for q in selected]}")
+        return selected
+
+    def _categorize_open_question(self, question: str) -> str:
+        """根据问题内容分类开放型问题"""
+        question_lower = question.lower()
+        
+        # 定义分类关键词
+        categories = {
+            'TFT器件技术': ['tft', '薄膜晶体管', '器件失效', '短沟道', '顶栅氧化物'],
+            'OLED显示技术': ['oled', '金属氧化物背板', '残影', '显示'],
+            '薄膜制造工艺': ['薄膜晶体管', '栅极', '介电层', '厚度', '材料选择'],
+            '显示面板优化': ['显示面板', '功耗', '亮度', '矛盾需求'],
+            'OLED生产工艺': ['大尺寸', 'oled面板', '均匀性', '良率'],
+            '柔性显示技术': ['柔性显示', '显示性能', '机械可靠性'],
+            '高分辨率技术': ['高分辨率', '信号完整性', 'emi', '显示驱动'],
+            '通用技术问题': []  # 默认分类
+        }
+        
+        # 计算每个分类的匹配分数
+        category_scores = {}
+        for category, keywords in categories.items():
+            score = sum(1 for keyword in keywords if keyword in question_lower)
+            if score > 0:
+                category_scores[category] = score
+        
+        # 返回得分最高的分类
+        if category_scores:
+            best_category = max(category_scores.items(), key=lambda x: x[1])[0]
+            return best_category
+        else:
+            return '通用技术问题'
 
     def _generate_complex_open_question_with_llm(self, subgraph: nx.DiGraph, 
                                                context: Dict, lang: str) -> str:
@@ -1189,3 +1374,80 @@ class QuestionGenerator:
                 })
         
         return qa_pairs
+
+    def _generate_detailed_stats_report(self, qa_pairs: List[Dict], 
+                                      final_distribution: Dict[str, int],
+                                      target_distribution: Dict[str, int],
+                                      total_subgraphs: int, 
+                                      valid_subgraphs: int) -> str:
+        """生成详细的统计报告"""
+        report_lines = []
+        report_lines.append("=" * 60)
+        report_lines.append("问题生成统计报告")
+        report_lines.append("=" * 60)
+        
+        # 基本统计
+        report_lines.append(f"子图处理: {total_subgraphs} 总数, {valid_subgraphs} 有效")
+        report_lines.append(f"生成问题: {len(qa_pairs)} 个高质量QA对")
+        report_lines.append("")
+        
+        # 问题类型分布对比
+        report_lines.append("问题类型分布对比:")
+        report_lines.append(f"{'类型':<15} {'目标':<8} {'实际':<8} {'比例':<10} {'达成率':<10}")
+        report_lines.append("-" * 55)
+        
+        total_actual = sum(final_distribution.values())
+        for q_type in self.question_types:
+            target = target_distribution.get(q_type, 0)
+            actual = final_distribution.get(q_type, 0)
+            actual_ratio = actual / total_actual if total_actual > 0 else 0
+            target_ratio = self.question_type_ratios.get(q_type, 0)
+            achievement_rate = actual / target if target > 0 else 0
+            
+            report_lines.append(
+                f"{q_type:<15} {target:<8} {actual:<8} "
+                f"{actual_ratio:.1%:<10} {achievement_rate:.1%:<10}"
+            )
+        
+        report_lines.append("")
+        
+        # 质量统计
+        if qa_pairs:
+            quality_scores = [qa.get('quality_score', 0) for qa in qa_pairs]
+            avg_quality = sum(quality_scores) / len(quality_scores)
+            
+            report_lines.append("质量统计:")
+            report_lines.append(f"平均质量分数: {avg_quality:.2f}")
+            report_lines.append(f"最高质量分数: {max(quality_scores):.2f}")
+            report_lines.append(f"最低质量分数: {min(quality_scores):.2f}")
+            report_lines.append("")
+        
+        # 生成方法统计
+        method_stats = {}
+        for qa in qa_pairs:
+            method = qa.get('generation_method', 'unknown')
+            method_stats[method] = method_stats.get(method, 0) + 1
+        
+        if method_stats:
+            report_lines.append("生成方法统计:")
+            for method, count in method_stats.items():
+                ratio = count / len(qa_pairs)
+                report_lines.append(f"{method}: {count} 个 ({ratio:.1%})")
+            report_lines.append("")
+        
+        # 开放型问题分类统计（如果有）
+        open_ended_categories = {}
+        for qa in qa_pairs:
+            if qa.get('type', '').startswith('open_ended'):
+                category = qa.get('question_category', '未分类')
+                open_ended_categories[category] = open_ended_categories.get(category, 0) + 1
+        
+        if open_ended_categories:
+            report_lines.append("开放型问题分类:")
+            for category, count in open_ended_categories.items():
+                report_lines.append(f"{category}: {count} 个")
+            report_lines.append("")
+        
+        report_lines.append("=" * 60)
+        
+        return "\n".join(report_lines)
