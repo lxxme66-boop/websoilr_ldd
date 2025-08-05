@@ -10,9 +10,22 @@ import json
 import logging
 import random
 from typing import List, Dict, Tuple, Optional
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
-from tqdm import tqdm
+try:
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+    import torch
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
+    AutoTokenizer = None
+    AutoModelForCausalLM = None
+    torch = None
+try:
+    from tqdm import tqdm
+except ImportError:
+    # Fallback if tqdm is not available
+    def tqdm(iterable, desc=None):
+        return iterable
+
 import networkx as nx
 
 logger = logging.getLogger(__name__)
@@ -84,8 +97,22 @@ class QuestionGenerator:
         
     def _load_qa_generator(self):
         """加载QA生成模型"""
-        model_config = self.config['models']['qa_generator_model']
-        model_path = model_config['path']
+        if not TRANSFORMERS_AVAILABLE:
+            logger.warning("transformers库不可用，将使用模板生成")
+            self.tokenizer = None
+            self.model = None
+            self.device = None
+            return
+            
+        model_config = self.config.get('models', {}).get('qa_generator_model', {})
+        model_path = model_config.get('path')
+        
+        if not model_path:
+            logger.warning("未配置QA生成模型路径，将使用模板生成")
+            self.tokenizer = None
+            self.model = None
+            self.device = None
+            return
         
         logger.info(f"加载QA生成模型: {model_path}")
         
@@ -98,19 +125,12 @@ class QuestionGenerator:
                 trust_remote_code=True
             )
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            self.model.eval()
         except Exception as e:
-            logger.warning(f"无法加载指定模型，使用默认模型: {e}")
-            # 使用较小的默认模型
-            self.tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True)
-            self.model = AutoModelForCausalLM.from_pretrained(
-                "THUDM/chatglm-6b",
-                torch_dtype=torch.float16,
-                device_map="auto",
-                trust_remote_code=True
-            )
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            
-        self.model.eval()
+            logger.warning(f"无法加载模型: {e}，将使用模板生成")
+            self.tokenizer = None
+            self.model = None
+            self.device = None
         
         # 设置生成参数
         self.max_length = model_config.get('max_length', 4096)
@@ -550,6 +570,10 @@ class QuestionGenerator:
                                                context: Dict, lang: str) -> str:
         """使用LLM生成复杂的开放型问题"""
         
+        # 如果模型不可用，返回None
+        if not self.model or not self.tokenizer:
+            return None
+        
         focus_entity = context['focus_entity']
         technical_domain = context['technical_domain']
         related_techs = ', '.join(context['related_technologies'][:3])
@@ -608,6 +632,10 @@ class QuestionGenerator:
     def _generate_open_ended_answer_with_llm(self, question: str, subgraph: nx.DiGraph, 
                                            tech_context: Dict) -> str:
         """生成开放型问题的答案"""
+        
+        # 如果模型不可用，返回简单答案
+        if not self.model or not self.tokenizer:
+            return f"这是一个关于{list(subgraph.nodes())[0] if subgraph.nodes() else '技术'}的开放性问题，需要综合考虑多个技术因素来回答。"
         
         context_info = f"""
 技术背景: {tech_context}
@@ -1106,19 +1134,393 @@ class QuestionGenerator:
     # 由于篇幅限制，这里仅列出方法签名，实际实现应该与原代码相同
     
     def _generate_factual_questions(self, subgraph: nx.DiGraph, features: Dict, lang: str) -> List[Dict]:
-        # 原有实现...
-        pass
+        """生成事实型问题"""
+        qa_pairs = []
+        
+        # 使用简化的模板
+        simple_templates = {
+            'zh_cn': [
+                "{entity}的主要特征是什么？",
+                "{entity}在系统中起什么作用？",
+                "{entity}有哪些重要属性？",
+                "什么是{entity}？"
+            ],
+            'en': [
+                "What are the main characteristics of {entity}?",
+                "What role does {entity} play in the system?",
+                "What are the important attributes of {entity}?",
+                "What is {entity}?"
+            ]
+        }
+        
+        templates = simple_templates.get(lang, simple_templates['zh_cn'])
+        
+        # 获取节点信息
+        entities = list(subgraph.nodes(data=True))
+        if len(entities) < 1:
+            return qa_pairs
+            
+        try:
+            # 选择模板
+            template = random.choice(templates)
+            
+            # 获取主要实体
+            main_entity = entities[0]
+            entity_name = main_entity[0]
+            entity_attrs = main_entity[1]
+            
+            # 生成问题
+            question = template.format(entity=entity_name)
+                
+            # 生成答案（基于实体属性）
+            answer_parts = [f"根据图谱信息，{entity_name}"]
+            if entity_attrs:
+                for key, value in entity_attrs.items():
+                    if key != 'type':
+                        answer_parts.append(f"{key}为{value}")
+                        
+            if len(answer_parts) == 1:
+                answer_parts.append("是一个重要的技术实体")
+                        
+            answer = "，".join(answer_parts) + "。"
+            
+            qa_pair = {
+                'id': str(uuid.uuid4()),
+                'question': question,
+                'answer': answer,
+                'type': 'factual',
+                'complexity': 'simple',
+                'entities': [entity_name],
+                'relations': [],
+                'generation_method': 'template'
+            }
+            
+            qa_pairs.append(qa_pair)
+            
+        except Exception as e:
+            logger.warning(f"生成事实型问题时出错: {str(e)}")
+            
+        return qa_pairs
     
     def _generate_comparison_questions(self, subgraph: nx.DiGraph, features: Dict, lang: str) -> List[Dict]:
-        # 原有实现...
-        pass
+        """生成比较型问题"""
+        qa_pairs = []
+        
+        if subgraph.number_of_nodes() < 2:
+            return qa_pairs
+        
+        # 使用简化的模板
+        simple_templates = {
+            'zh_cn': [
+                "{entity1}和{entity2}有什么区别？",
+                "比较{entity1}和{entity2}的特点",
+                "{entity1}与{entity2}相比有什么优势？"
+            ],
+            'en': [
+                "What are the differences between {entity1} and {entity2}?",
+                "Compare the characteristics of {entity1} and {entity2}",
+                "What advantages does {entity1} have over {entity2}?"
+            ]
+        }
+        
+        templates = simple_templates.get(lang, simple_templates['zh_cn'])
+            
+        try:
+            # 获取两个不同的实体进行比较
+            entities = list(subgraph.nodes(data=True))
+            entity1, entity2 = entities[0], entities[1]
+            
+            template = random.choice(templates)
+            question = template.format(entity1=entity1[0], entity2=entity2[0])
+            
+            # 生成比较答案
+            answer = f"比较{entity1[0]}和{entity2[0]}："
+            
+            # 比较属性
+            attrs1 = entity1[1]
+            attrs2 = entity2[1]
+            
+            common_attrs = set(attrs1.keys()) & set(attrs2.keys())
+            if common_attrs:
+                for attr in common_attrs:
+                    if attr != 'type':
+                        answer += f" {attr}方面，{entity1[0]}为{attrs1[attr]}，{entity2[0]}为{attrs2[attr]}；"
+            else:
+                answer += f" {entity1[0]}和{entity2[0]}是两种不同的技术实体，各有其特点和应用场景。"
+            
+            qa_pair = {
+                'id': str(uuid.uuid4()),
+                'question': question,
+                'answer': answer,
+                'type': 'comparison',
+                'complexity': 'medium',
+                'entities': [entity1[0], entity2[0]],
+                'relations': [],
+                'generation_method': 'template'
+            }
+            
+            qa_pairs.append(qa_pair)
+            
+        except Exception as e:
+            logger.warning(f"生成比较型问题时出错: {str(e)}")
+            
+        return qa_pairs
     
     def _generate_reasoning_questions(self, subgraph: nx.DiGraph, features: Dict, lang: str) -> List[Dict]:
-        # 原有实现...
-        pass
+        """生成推理型问题"""
+        qa_pairs = []
+        
+        if subgraph.number_of_edges() < 1:
+            return qa_pairs
+        
+        # 使用简化的模板
+        simple_templates = {
+            'zh_cn': [
+                "为什么{source}与{target}相关？",
+                "{source}如何影响{target}？",
+                "{source}和{target}之间的关系说明了什么？"
+            ],
+            'en': [
+                "Why are {source} and {target} related?",
+                "How does {source} affect {target}?",
+                "What does the relationship between {source} and {target} indicate?"
+            ]
+        }
+        
+        templates = simple_templates.get(lang, simple_templates['zh_cn'])
+            
+        try:
+            # 获取关系信息
+            edges = list(subgraph.edges(data=True))
+            edge = edges[0]
+            source, target, edge_data = edge
+            
+            template = random.choice(templates)
+            question = template.format(source=source, target=target)
+            
+            # 生成推理答案
+            relation = edge_data.get('relation', '相关')
+            answer = f"根据图谱分析，{source}与{target}之间存在{relation}关系。"
+            
+            # 添加推理逻辑
+            if 'cause' in relation.lower() or '导致' in relation:
+                answer += f"这表明{source}可能是{target}的原因或影响因素。"
+            elif 'part' in relation.lower() or '部分' in relation:
+                answer += f"这表明{target}是{source}的组成部分。"
+            else:
+                answer += f"这种{relation}关系在该领域中具有重要意义。"
+            
+            qa_pair = {
+                'id': str(uuid.uuid4()),
+                'question': question,
+                'answer': answer,
+                'type': 'reasoning',
+                'complexity': 'medium',
+                'entities': [source, target],
+                'relations': [relation],
+                'generation_method': 'template'
+            }
+            
+            qa_pairs.append(qa_pair)
+            
+        except Exception as e:
+            logger.warning(f"生成推理型问题时出错: {str(e)}")
+            
+        return qa_pairs
     
     def _generate_multihop_questions(self, subgraph: nx.DiGraph, features: Dict, lang: str) -> List[Dict]:
-        # 原有实现...
-        pass
+        """生成多跳型问题"""
+        qa_pairs = []
+        
+        if subgraph.number_of_nodes() < 3:
+            return qa_pairs
+        
+        # 使用简化的模板
+        simple_templates = {
+            'zh_cn': [
+                "{start}如何通过中间环节影响{end}？",
+                "从{start}到{end}的影响路径是什么？",
+                "{start}和{end}之间的连接关系如何？"
+            ],
+            'en': [
+                "How does {start} affect {end} through intermediate steps?",
+                "What is the influence path from {start} to {end}?",
+                "How are {start} and {end} connected?"
+            ]
+        }
+        
+        templates = simple_templates.get(lang, simple_templates['zh_cn'])
+            
+        try:
+            # 找到一条路径（至少3个节点）
+            nodes = list(subgraph.nodes())
+            if len(nodes) >= 3:
+                # 尝试找到连接的路径
+                path = None
+                for start_node in nodes[:2]:  # 限制搜索范围
+                    for end_node in nodes[2:4]:
+                        try:
+                            if nx.has_path(subgraph, start_node, end_node):
+                                path = nx.shortest_path(subgraph, start_node, end_node)
+                                if len(path) >= 3:
+                                    break
+                        except:
+                            continue
+                    if path and len(path) >= 3:
+                        break
+                
+                if path and len(path) >= 3:
+                    template = random.choice(templates)
+                    question = template.format(start=path[0], end=path[-1])
+                    
+                    # 生成多跳答案
+                    answer = f"从{path[0]}到{path[-1]}的路径："
+                    for i in range(len(path) - 1):
+                        edge_data = subgraph.get_edge_data(path[i], path[i+1], {})
+                        relation = edge_data.get('relation', '连接')
+                        answer += f" {path[i]} -{relation}-> {path[i+1]};"
+                    
+                    qa_pair = {
+                        'id': str(uuid.uuid4()),
+                        'question': question,
+                        'answer': answer,
+                        'type': 'multi_hop',
+                        'complexity': 'complex',
+                        'entities': path,
+                        'relations': [],
+                        'generation_method': 'template'
+                    }
+                    
+                    qa_pairs.append(qa_pair)
+                    
+        except Exception as e:
+            logger.warning(f"生成多跳型问题时出错: {str(e)}")
+            
+        return qa_pairs
     
-    # ... 其他所有原有方法 ...
+    def _analyze_subgraph(self, subgraph: nx.DiGraph) -> Dict:
+        """分析子图特征"""
+        features = {
+            'num_nodes': subgraph.number_of_nodes(),
+            'num_edges': subgraph.number_of_edges(),
+            'density': nx.density(subgraph) if subgraph.number_of_nodes() > 1 else 0,
+            'entities': list(subgraph.nodes()),
+            'relations': []
+        }
+        
+        # 收集关系信息
+        for source, target, data in subgraph.edges(data=True):
+            relation = data.get('relation', 'unknown')
+            features['relations'].append({
+                'source': source,
+                'target': target,
+                'relation': relation
+            })
+        
+        return features
+    
+    def _convert_dict_to_nx(self, subgraph_dict: dict) -> nx.DiGraph:
+        """将字典格式的子图转换为NetworkX图"""
+        graph = nx.DiGraph()
+        
+        # 添加节点
+        nodes = subgraph_dict.get('nodes', [])
+        for node in nodes:
+            if isinstance(node, dict):
+                node_id = node.get('id', str(uuid.uuid4()))
+                graph.add_node(node_id, **node)
+            else:
+                graph.add_node(str(node))
+        
+        # 添加边
+        edges = subgraph_dict.get('edges', [])
+        for edge in edges:
+            if isinstance(edge, dict):
+                source = edge.get('source', edge.get('from'))
+                target = edge.get('target', edge.get('to'))
+                if source and target:
+                    graph.add_edge(source, target, **edge)
+            elif isinstance(edge, (list, tuple)) and len(edge) >= 2:
+                graph.add_edge(edge[0], edge[1])
+        
+        return graph
+    
+    def _is_question_type_suitable(self, q_type: str, num_nodes: int, num_edges: int) -> bool:
+        """检查问题类型是否适用于当前子图"""
+        if q_type == 'factual':
+            return num_nodes >= 1
+        elif q_type == 'comparison':
+            return num_nodes >= 2
+        elif q_type == 'reasoning':
+            return num_edges >= 1
+        elif q_type == 'multi_hop':
+            return num_nodes >= 3 and num_edges >= 2
+        elif q_type == 'open_ended':
+            return num_nodes >= 1
+        return True
+    
+    def _validate_qa(self, qa: Dict) -> bool:
+        """验证QA对的有效性"""
+        required_fields = ['question', 'answer', 'type']
+        return all(field in qa and qa[field] for field in required_fields)
+    
+    def _filter_qa_pairs(self, qa_pairs: List[Dict]) -> List[Dict]:
+        """过滤QA对，移除低质量的问题"""
+        filtered = []
+        
+        for qa in qa_pairs:
+            # 长度检查
+            question = qa.get('question', '')
+            answer = qa.get('answer', '')
+            
+            if len(question) < 10 or len(answer) < 10:
+                continue
+                
+            # 重复检查
+            question_fingerprint = question.lower().strip()
+            if question_fingerprint in self.question_fingerprints:
+                continue
+                
+            self.question_fingerprints.add(question_fingerprint)
+            filtered.append(qa)
+        
+        return filtered
+    
+    def _generate_detailed_stats_report(self, qa_pairs: List[Dict], 
+                                      final_distribution: Dict[str, int],
+                                      target_distribution: Dict[str, int],
+                                      total_subgraphs: int,
+                                      valid_subgraphs: int) -> str:
+        """生成详细的统计报告"""
+        report_lines = []
+        report_lines.append("=" * 60)
+        report_lines.append("问题生成统计报告")
+        report_lines.append("=" * 60)
+        
+        # 基本统计
+        report_lines.append(f"总子图数量: {total_subgraphs}")
+        report_lines.append(f"有效子图数量: {valid_subgraphs}")
+        report_lines.append(f"生成问题总数: {len(qa_pairs)}")
+        report_lines.append("")
+        
+        # 类型分布
+        report_lines.append("问题类型分布:")
+        report_lines.append(f"{'类型':<15} {'目标':<8} {'实际':<8} {'比例':<10} {'达成率':<10}")
+        report_lines.append("-" * 60)
+        
+        total_actual = sum(final_distribution.values())
+        for q_type in self.question_types:
+            target = target_distribution.get(q_type, 0)
+            actual = final_distribution.get(q_type, 0)
+            actual_ratio = actual / total_actual if total_actual > 0 else 0
+            achievement_rate = actual / target if target > 0 else 0
+            
+            report_lines.append(
+                f"{q_type:<15} {target:<8} {actual:<8} "
+                f"{actual_ratio:.1%:<10} {achievement_rate:.1%:<10}"
+            )
+        
+        report_lines.append("")
+        report_lines.append("=" * 60)
+        
+        return "\n".join(report_lines)
