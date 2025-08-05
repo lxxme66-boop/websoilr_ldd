@@ -1,0 +1,170 @@
+{
+  "config_templates": {
+    "balanced_config": {
+      "name": "均衡配置",
+      "description": "各种问题类型均衡分布，适合通用场景",
+      "question_type_ratios": {
+        "factual": 0.25,
+        "comparison": 0.20,
+        "reasoning": 0.25,
+        "multi_hop": 0.15,
+        "open_ended": 0.15
+      }
+    },
+    
+    "open_ended_focused": {
+      "name": "开放型重点配置",
+      "description": "重点生成开放型问题，适合创新思维训练",
+      "question_type_ratios": {
+        "factual": 0.15,
+        "comparison": 0.15,
+        "reasoning": 0.20,
+        "multi_hop": 0.10,
+        "open_ended": 0.40
+      }
+    },
+    
+    "traditional_qa": {
+      "name": "传统问答配置",
+      "description": "专注于事实和推理问题，适合基础知识测试",
+      "question_type_ratios": {
+        "factual": 0.40,
+        "comparison": 0.30,
+        "reasoning": 0.30,
+        "multi_hop": 0.00,
+        "open_ended": 0.00
+      }
+    },
+    
+    "complex_reasoning": {
+      "name": "复杂推理配置",
+      "description": "重点生成推理和多跳问题，适合高级分析能力训练",
+      "question_type_ratios": {
+        "factual": 0.10,
+        "comparison": 0.15,
+        "reasoning": 0.35,
+        "multi_hop": 0.25,
+        "open_ended": 0.15
+      }
+    },
+    
+    "tcl_technical": {
+      "name": "TCL技术问题配置",
+      "description": "针对TCL技术领域的专业问题生成",
+      "question_type_ratios": {
+        "factual": 0.20,
+        "comparison": 0.25,
+        "reasoning": 0.30,
+        "multi_hop": 0.10,
+        "open_ended": 0.15
+      },
+      "open_ended_templates": [
+        "怎么实现短沟道的顶栅氧化物TFT器件且同时避免器件失效？",
+        "金属氧化物背板在短时间内驱动OLED显示时会出现残影，请问如何在TFT方面改善残影问题？",
+        "在OLED制造工艺中，如何平衡发光效率、使用寿命和成本控制三个关键因素？",
+        "面对Mini-LED背光技术的挑战，传统LCD显示技术应该如何进行技术升级和创新？",
+        "在柔性显示屏的量产过程中，如何解决弯曲半径与显示质量之间的技术矛盾？"
+      ]
+    }
+  },
+  
+  "usage_scenarios": {
+    "training_data_generation": {
+      "description": "为AI模型训练生成多样化的问答数据",
+      "recommended_config": "balanced_config",
+      "total_questions": 10000,
+      "quality_threshold": 0.8
+    },
+    
+    "innovation_workshop": {
+      "description": "为创新研讨会准备开放性讨论问题",
+      "recommended_config": "open_ended_focused",
+      "total_questions": 50,
+      "quality_threshold": 0.9
+    },
+    
+    "technical_assessment": {
+      "description": "技术人员能力评估问题集",
+      "recommended_config": "complex_reasoning",
+      "total_questions": 200,
+      "quality_threshold": 0.85
+    },
+    
+    "knowledge_base_qa": {
+      "description": "知识库问答系统的问题生成",
+      "recommended_config": "tcl_technical",
+      "total_questions": 5000,
+      "quality_threshold": 0.75
+    }
+  },
+  
+  "customization_guide": {
+    "ratio_adjustment": {
+      "description": "如何调整问题类型比例",
+      "steps": [
+        "1. 确定目标应用场景",
+        "2. 分析用户需求和能力水平",
+        "3. 选择合适的基础配置模板",
+        "4. 根据具体需求微调比例",
+        "5. 进行小规模测试验证效果",
+        "6. 根据反馈进一步优化"
+      ]
+    },
+    
+    "open_ended_customization": {
+      "description": "开放型问题的定制化方法",
+      "guidelines": [
+        "确保问题具有探索性，没有标准答案",
+        "问题应涉及多个技术维度或约束条件",
+        "结合实际工程问题和应用场景",
+        "保持专业术语的准确性",
+        "避免过于宽泛或过于具体的问题"
+      ]
+    },
+    
+    "quality_control": {
+      "description": "质量控制参数设置建议",
+      "parameters": {
+        "min_question_length": {
+          "factual": 30,
+          "comparison": 50,
+          "reasoning": 60,
+          "multi_hop": 70,
+          "open_ended": 80
+        },
+        "max_question_length": {
+          "factual": 200,
+          "comparison": 300,
+          "reasoning": 400,
+          "multi_hop": 350,
+          "open_ended": 500
+        },
+        "min_answer_length": {
+          "factual": 20,
+          "comparison": 50,
+          "reasoning": 80,
+          "multi_hop": 60,
+          "open_ended": 100
+        }
+      }
+    }
+  },
+  
+  "implementation_notes": {
+    "version": "1.0",
+    "last_updated": "2024-01-01",
+    "features": [
+      "支持5种问题类型的比例控制",
+      "包含预定义的开放型问题模板",
+      "提供多种应用场景的配置模板",
+      "支持质量控制参数的精细调整",
+      "兼容原有的问题生成功能"
+    ],
+    "usage_tips": [
+      "开放型问题比例不建议超过50%，以保持问题集的多样性",
+      "在生产环境中建议先进行小规模测试",
+      "可以根据实际效果动态调整问题类型比例",
+      "定期检查生成问题的质量和相关性"
+    ]
+  }
+}
