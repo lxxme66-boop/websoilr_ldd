@@ -7,9 +7,9 @@ import json
 import random
 import os
 
-async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_tasks=20, selected_task_number=500):
+async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_tasks=20, selected_task_number=500, storage_folder=None, read_hist=False):
     total_tasks = []
-    if args.read_hist and os.path.exists(os.path.join(storage_folder, "total_response.json")):
+    if read_hist and os.path.exists(os.path.join(storage_folder, "total_response.json")):
         print(f"Reading history data from {storage_folder}/total_response.json")
         history_data = json.load(open(os.path.join(storage_folder, "total_response.json"), "r", encoding="utf-8"))
         processed_files = [example["source_file"] for example in history_data if "source_file" in example]
@@ -124,7 +124,9 @@ async def main(index=43, parallel_batch_size=100, pdf_path=None, storage_folder=
     final_results = await process_folders(files, pdf_path, temporary_folder, 
                                         index=index, 
                                         maximum_tasks=parallel_batch_size,
-                                        selected_task_number=selected_task_number)
+                                        selected_task_number=selected_task_number,
+                                        storage_folder=storage_folder,
+                                        read_hist=read_hist)
     
     # Save results
     output_file = os.path.join(storage_folder, "total_response.pkl")
@@ -165,7 +167,9 @@ if __name__ == "__main__":
     
     final_results = asyncio.run(process_folders(files, txt_path, temporary_folder, index=index, 
                                                maximum_tasks=parallel_batch_size,
-                                               selected_task_number=selected_task_number))
+                                               selected_task_number=selected_task_number,
+                                               storage_folder=storage_folder,
+                                               read_hist=args.read_hist))
     
     # Save results
     f = open(os.path.join(storage_folder, "total_response.pkl"), "wb")
