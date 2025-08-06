@@ -117,14 +117,33 @@ echo "==================================="
 
 # Optional: Run quality check
 echo ""
+echo "==================================="
+echo "Quality Check Options"
+echo "==================================="
+echo "The system now supports enhanced quality checking with:"
+echo "- Dual-stage verification (model answer + correctness check)"
+echo "- Detailed quality reports and statistics"
+echo "- Multi-format output (JSON, CSV, quality report)"
+echo ""
 read -p "Do you want to run quality check? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo ""
+    echo "Choose quality check mode:"
+    echo "1. Enhanced Quality Check (Recommended) - Dual-stage verification with detailed reports"
+    echo "2. Standard Quality Check - Basic scoring method (legacy compatibility)"
+    echo ""
     read -p "Use enhanced quality check? (y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo ""
         echo "Running enhanced quality check..."
+        echo "This will generate:"
+        echo "- Detailed verification results (*_detailed.json)"
+        echo "- High-quality filtered data (*_high_quality.json)"
+        echo "- Comprehensive quality report (*_quality_report.json)"
+        echo "- CSV analysis file (*_results.csv)"
+        echo ""
         python text_qa_generation.py \
             --file_path "$OUTPUT_DIR/results_343.json" \
             --output_file "$OUTPUT_DIR" \
@@ -134,8 +153,18 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
             --ark_url "$ARK_URL" \
             --api_key "$ARK_API_KEY" \
             --model "$MODEL_PATH"
+        
+        if [ $? -eq 0 ]; then
+            echo ""
+            echo "Enhanced quality check completed!"
+            echo "Check the following files in $OUTPUT_DIR:"
+            echo "- results_343_quality_report.json for overall statistics"
+            echo "- results_343_high_quality.json for filtered high-quality QA pairs"
+            echo "- results_343_detailed.json for detailed verification information"
+        fi
     else
-        echo "Running standard quality check..."
+        echo ""
+        echo "Running standard quality check (legacy mode)..."
         python text_qa_generation.py \
             --file_path "$OUTPUT_DIR/results_343.json" \
             --output_file "$OUTPUT_DIR" \
