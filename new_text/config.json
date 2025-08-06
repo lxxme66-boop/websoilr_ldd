@@ -29,10 +29,10 @@
   },
   
   "models": {
-    "default_model": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
+    "default_model": "ollama:qwen:7b",
     "qa_generator_model": {
-      "type": "openai_compatible",
-      "path": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
+      "type": "ollama",
+      "path": "qwen:7b",
       "temperature": 0.8,
       "max_tokens": 4096,
       "top_p": 0.9
