@@ -1,439 +1,452 @@
 #!/bin/bash
 
-# Text QA Generation Pipeline with Enhanced Quality Check
-# This script runs the complete pipeline for generating QA pairs from text documents
-# Version 2.0 - Enhanced Quality Check Edition
+# Text QA Generation Pipeline Script
+# 支持多模态处理、本地模型、专业领域定制和数据改写功能
 
-# Color codes for better output
+set -e  # 遇到错误时退出
+
+# 默认配置
+DEFAULT_BATCH_SIZE=50
+DEFAULT_POOL_SIZE=100
+DEFAULT_MAX_TASKS=1000
+DEFAULT_INDEX=343
+DEFAULT_QUALITY_THRESHOLD=0.7
+DEFAULT_CONCURRENCY=5
+
+# 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Set default values
-INPUT_DIR="${INPUT_DIR:-data/input_texts}"
-OUTPUT_DIR="${OUTPUT_DIR:-data/output}"
-BATCH_SIZE="${BATCH_SIZE:-50}"
-POOL_SIZE="${POOL_SIZE:-100}"
-TASK_NUMBER="${TASK_NUMBER:-1000}"
-QUALITY_THRESHOLD="${QUALITY_THRESHOLD:-0.7}"
-PARALLEL_CORES="${PARALLEL_CORES:-10}"
-
-# API configuration
-export ARK_API_KEY="${ARK_API_KEY:-ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b}"
-export ARK_URL="${ARK_URL:-http://0.0.0.0:8080/v1}"
-export MODEL_PATH="${MODEL_PATH:-/mnt/storage/models/Skywork/Skywork-R1V3-38B}"
-
-# Function to print colored output
-print_info() {
+# 日志函数
+log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
 
-print_success() {
+log_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
-print_warning() {
+log_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-print_error() {
+log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Function to check if command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
+log_step() {
+    echo -e "${PURPLE}[STEP]${NC} $1"
 }
 
-# Function to check prerequisites
-check_prerequisites() {
-    print_info "Checking prerequisites..."
-    
-    if ! command_exists python; then
-        print_error "Python is not installed or not in PATH"
-        exit 1
-    fi
-    
-    if ! python -c "import asyncio, json, pandas" 2>/dev/null; then
-        print_error "Required Python packages are missing. Please run: pip install -r requirements.txt"
-        exit 1
-    fi
-    
-    print_success "Prerequisites check passed"
-}
-
-# Function to validate model path
-validate_model_path() {
-    if [ ! -z "$MODEL_PATH" ] && [ ! -d "$MODEL_PATH" ]; then
-        print_warning "Model path does not exist: $MODEL_PATH"
-        print_warning "Please ensure the model path is correct"
-    fi
-}
-
-# Function to display configuration
-display_config() {
-    echo ""
-    echo -e "${BLUE}============================================${NC}"
-    echo -e "${BLUE}Text QA Generation Pipeline v2.0${NC}"
-    echo -e "${BLUE}Enhanced Quality Check Edition${NC}"
-    echo -e "${BLUE}============================================${NC}"
-    echo -e "${YELLOW}Configuration:${NC}"
-    echo "  Input directory: $INPUT_DIR"
-    echo "  Output directory: $OUTPUT_DIR"
-    echo "  Batch size: $BATCH_SIZE"
-    echo "  Pool size: $POOL_SIZE"
-    echo "  Target task number: $TASK_NUMBER"
-    echo "  Quality threshold: $QUALITY_THRESHOLD"
-    echo "  Parallel cores: $PARALLEL_CORES"
-    echo "  API URL: $ARK_URL"
-    echo "  Model: $MODEL_PATH"
-    echo -e "${BLUE}============================================${NC}"
-    echo ""
-}
-
-# Function to create directories
-create_directories() {
-    print_info "Creating directories..."
-    mkdir -p "$INPUT_DIR"
-    mkdir -p "$OUTPUT_DIR"
-    mkdir -p "$OUTPUT_DIR/TEMP"
-    print_success "Directories created"
-}
-
-# Function to check input files
-check_input_files() {
-    print_info "Checking input files..."
-    
-    if [ -z "$(ls -A $INPUT_DIR/*.txt 2>/dev/null)" ]; then
-        print_error "No .txt files found in $INPUT_DIR"
-        print_info "Please add text files to process."
-        print_info "You can use the sample file: data/input_texts/sample_igzo_tft.txt"
-        exit 1
-    fi
-    
-    local file_count=$(ls -1 $INPUT_DIR/*.txt 2>/dev/null | wc -l)
-    print_success "Found $file_count text file(s) to process"
-}
-
-# Function to run a step with error checking
-run_step() {
-    local step_name="$1"
-    local step_number="$2"
-    shift 2
-    local command="$@"
-    
-    echo ""
-    print_info "Step $step_number: $step_name..."
-    
-    if eval "$command"; then
-        print_success "Step $step_number completed successfully"
-        return 0
-    else
-        print_error "Step $step_number failed: $step_name"
-        print_error "Command: $command"
-        return 1
-    fi
-}
-
-# Function to generate final report
-generate_final_report() {
-    print_info "Generating final report..."
-    
-    python -c "
-import json
-import os
-
-output_dir = '$OUTPUT_DIR'
-results_file = os.path.join(output_dir, 'results_343.json')
-stats_file = os.path.join(output_dir, 'results_343_stats.json')
-
-print()
-print('=' * 50)
-print('QA Generation Results Summary')
-print('=' * 50)
-
-if os.path.exists(results_file):
-    with open(results_file, 'r', encoding='utf-8') as f:
-        results = json.load(f)
-    
-    total_qa = len(results) if isinstance(results, list) else len(results.get('qa_pairs', []))
-    print(f'📊 Total QA pairs generated: {total_qa}')
-
-if os.path.exists(stats_file):
-    with open(stats_file, 'r', encoding='utf-8') as f:
-        stats = json.load(f)
-    
-    print()
-    print('📈 Question type distribution:')
-    for q_type, percentage in stats.get('question_type_percentages', {}).items():
-        count = stats.get('question_types', {}).get(q_type, 0)
-        print(f'  • {q_type}: {count} ({percentage})')
-    
-    avg_q_len = stats.get('average_question_length', 0)
-    avg_a_len = stats.get('average_answer_length', 0)
-    print(f'📏 Average question length: {avg_q_len:.1f} characters')
-    print(f'📏 Average answer length: {avg_a_len:.1f} characters')
-    
-    print()
-    print('📁 Source files processed:')
-    for source, count in stats.get('source_files', {}).items():
-        print(f'  • {source}: {count} QA pairs')
-
-print()
-print('💾 Output files location: $OUTPUT_DIR')
-print('=' * 50)
-"
-}
-
-# Function to run quality check
-run_quality_check() {
-    local use_enhanced="$1"
-    
-    if [ "$use_enhanced" = "true" ]; then
-        print_info "Running enhanced quality check (dual-stage verification)..."
-        print_info "This may take longer but provides more accurate quality assessment"
-        
-        local cmd="python text_qa_generation.py \
-            --file_path '$OUTPUT_DIR/results_343.json' \
-            --output_file '$OUTPUT_DIR' \
-            --check_task True \
-            --enhanced_quality True \
-            --quality_threshold $QUALITY_THRESHOLD \
-            --ark_url '$ARK_URL' \
-            --api_key '$ARK_API_KEY' \
-            --model '$MODEL_PATH'"
-        
-        if eval "$cmd"; then
-            print_success "Enhanced quality check completed"
-            
-            # Display quality check results
-            python -c "
-import json
-import os
-
-output_dir = '$OUTPUT_DIR'
-quality_report_file = os.path.join(output_dir, 'results_343_quality_report.json')
-
-if os.path.exists(quality_report_file):
-    with open(quality_report_file, 'r', encoding='utf-8') as f:
-        report = json.load(f)
-    
-    print()
-    print('🔍 Enhanced Quality Check Results:')
-    print('=' * 40)
-    print(f'📊 Total QA pairs: {report.get(\"total_qa_pairs\", 0)}')
-    print(f'✅ Passed QA pairs: {report.get(\"passed_qa_pairs\", 0)}')
-    print(f'📈 Pass rate: {report.get(\"pass_rate\", 0):.2%}')
-    print(f'🎯 Quality threshold: {report.get(\"quality_threshold\", 0)}')
-    print(f'🏆 Meets threshold: {\"Yes\" if report.get(\"meets_threshold\", False) else \"No\"}')
-    
-    if 'statistics' in report:
-        stats = report['statistics']
-        print()
-        print('📋 Quality Statistics:')
-        print(f'  • Avg question length: {stats.get(\"avg_question_length\", 0):.1f} chars')
-        print(f'  • Avg answer length: {stats.get(\"avg_answer_length\", 0):.1f} chars')
-        
-        dist = stats.get('question_types_distribution', {})
-        if dist:
-            print('  • Question types distribution:')
-            for q_type, count in dist.items():
-                print(f'    - {q_type}: {count}')
-    
-    print()
-    print('📄 Generated files:')
-    print(f'  • Detailed results: results_343_detailed.json')
-    print(f'  • High quality data: results_343_high_quality.json')
-    print(f'  • Quality report: results_343_quality_report.json')
-    print(f'  • CSV analysis: results_343_results.csv')
-    print('=' * 40)
-else:
-    print('⚠️  Quality report not found. Check if quality check completed successfully.')
-"
-        else
-            print_error "Enhanced quality check failed"
-            return 1
-        fi
-        
-    else
-        print_info "Running standard quality check..."
-        
-        local cmd="python text_qa_generation.py \
-            --file_path '$OUTPUT_DIR/results_343.json' \
-            --output_file '$OUTPUT_DIR' \
-            --check_task True \
-            --enhanced_quality False \
-            --check_indexes '(40, 37, 38)' \
-            --check_times 5 \
-            --ark_url '$ARK_URL' \
-            --api_key '$ARK_API_KEY' \
-            --model '$MODEL_PATH'"
-        
-        if eval "$cmd"; then
-            print_success "Standard quality check completed"
-        else
-            print_error "Standard quality check failed"
-            return 1
-        fi
-    fi
-}
-
-# Function to ask user for quality check preferences
-ask_quality_check() {
-    echo ""
-    print_info "Quality Check Options:"
-    echo "  1. Skip quality check (faster)"
-    echo "  2. Run standard quality check"
-    echo "  3. Run enhanced quality check (recommended, but slower)"
-    echo ""
-    
-    while true; do
-        read -p "$(echo -e ${YELLOW}Choose an option [1-3]:${NC} )" choice
-        case $choice in
-            1)
-                print_info "Skipping quality check"
-                return 0
-                ;;
-            2)
-                run_quality_check "false"
-                return $?
-                ;;
-            3)
-                run_quality_check "true"
-                return $?
-                ;;
-            *)
-                print_warning "Please enter 1, 2, or 3"
-                ;;
-        esac
-    done
-}
-
-# Function to display help
+# 帮助信息
 show_help() {
-    echo "Text QA Generation Pipeline v2.0"
-    echo "Enhanced Quality Check Edition"
+    echo -e "${CYAN}Text QA Generation Pipeline${NC}"
     echo ""
-    echo "Usage: $0 [OPTIONS]"
+    echo "用法: $0 [OPTIONS]"
     echo ""
-    echo "Environment Variables:"
-    echo "  INPUT_DIR         Input directory for text files (default: data/input_texts)"
-    echo "  OUTPUT_DIR        Output directory (default: data/output)"
-    echo "  BATCH_SIZE        Batch size for processing (default: 50)"
-    echo "  POOL_SIZE         Pool size for QA generation (default: 100)"
-    echo "  TASK_NUMBER       Target number of tasks (default: 1000)"
-    echo "  QUALITY_THRESHOLD Quality threshold for enhanced check (default: 0.7)"
-    echo "  PARALLEL_CORES    Number of parallel cores for quality check (default: 10)"
-    echo "  ARK_API_KEY       API key for the service"
-    echo "  ARK_URL           API URL (default: http://0.0.0.0:8080/v1)"
-    echo "  MODEL_PATH        Path to the model"
+    echo "选项:"
+    echo "  --mode MODE                 运行模式 (text|pdf|multimodal|rewrite|quality_check)"
+    echo "  --input_dir DIR            输入目录"
+    echo "  --output_dir DIR           输出目录 (默认: data/output)"
+    echo "  --model_type TYPE          模型类型 (api|ollama|vllm|transformers)"
+    echo "  --model_name NAME          模型名称"
+    echo "  --domain DOMAIN            专业领域 (semiconductor|optics|materials)"
+    echo "  --batch_size SIZE          批处理大小 (默认: $DEFAULT_BATCH_SIZE)"
+    echo "  --pool_size SIZE           并发池大小 (默认: $DEFAULT_POOL_SIZE)"
+    echo "  --index INDEX              Prompt索引 (默认: $DEFAULT_INDEX)"
+    echo "  --quality_threshold FLOAT  质量阈值 (默认: $DEFAULT_QUALITY_THRESHOLD)"
+    echo "  --enhanced_quality         启用增强质量检查"
+    echo "  --rewrite                  启用数据改写"
+    echo "  --professional             启用专业增强"
+    echo "  --help                     显示此帮助信息"
     echo ""
-    echo "Options:"
-    echo "  -h, --help        Show this help message"
-    echo "  --test            Run test mode (validate setup only)"
+    echo "运行模式:"
+    echo "  text        - 纯文本问答生成"
+    echo "  pdf         - PDF文档处理和问答生成"
+    echo "  multimodal  - 多模态（图文）问答生成"
+    echo "  rewrite     - 数据改写和增强"
+    echo "  quality_check - 质量检查和评估"
     echo ""
-    echo "Examples:"
-    echo "  # Run with default settings"
-    echo "  bash run_pipeline.sh"
+    echo "示例:"
+    echo "  $0 --mode text --input_dir data/texts --model_type ollama"
+    echo "  $0 --mode pdf --input_dir data/pdfs --domain semiconductor"
+    echo "  $0 --mode rewrite --input_dir data/qa_pairs.json --professional"
     echo ""
-    echo "  # Run with custom batch size and pool size"
-    echo "  BATCH_SIZE=100 POOL_SIZE=200 bash run_pipeline.sh"
-    echo ""
-    echo "  # Run with custom quality threshold"
-    echo "  QUALITY_THRESHOLD=0.8 bash run_pipeline.sh"
 }
 
-# Function to run test mode
-run_test_mode() {
-    print_info "Running in test mode - validating setup..."
-    
-    check_prerequisites
-    validate_model_path
-    create_directories
-    check_input_files
-    
-    print_success "Test mode completed - setup is valid!"
-    print_info "You can now run the full pipeline without --test flag"
-    exit 0
-}
+# 解析命令行参数
+MODE="text"
+INPUT_DIR=""
+OUTPUT_DIR="data/output"
+MODEL_TYPE="api"
+MODEL_NAME=""
+DOMAIN="semiconductor"
+BATCH_SIZE=$DEFAULT_BATCH_SIZE
+POOL_SIZE=$DEFAULT_POOL_SIZE
+INDEX=$DEFAULT_INDEX
+QUALITY_THRESHOLD=$DEFAULT_QUALITY_THRESHOLD
+ENHANCED_QUALITY=false
+REWRITE=false
+PROFESSIONAL=false
 
-# Main execution starts here
-main() {
-    # Parse command line arguments
-    case "$1" in
-        -h|--help)
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --mode)
+            MODE="$2"
+            shift 2
+            ;;
+        --input_dir)
+            INPUT_DIR="$2"
+            shift 2
+            ;;
+        --output_dir)
+            OUTPUT_DIR="$2"
+            shift 2
+            ;;
+        --model_type)
+            MODEL_TYPE="$2"
+            shift 2
+            ;;
+        --model_name)
+            MODEL_NAME="$2"
+            shift 2
+            ;;
+        --domain)
+            DOMAIN="$2"
+            shift 2
+            ;;
+        --batch_size)
+            BATCH_SIZE="$2"
+            shift 2
+            ;;
+        --pool_size)
+            POOL_SIZE="$2"
+            shift 2
+            ;;
+        --index)
+            INDEX="$2"
+            shift 2
+            ;;
+        --quality_threshold)
+            QUALITY_THRESHOLD="$2"
+            shift 2
+            ;;
+        --enhanced_quality)
+            ENHANCED_QUALITY=true
+            shift
+            ;;
+        --rewrite)
+            REWRITE=true
+            shift
+            ;;
+        --professional)
+            PROFESSIONAL=true
+            shift
+            ;;
+        --help)
             show_help
             exit 0
             ;;
-        --test)
-            run_test_mode
+        *)
+            log_error "未知参数: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
+# 检查必需的参数
+if [[ -z "$INPUT_DIR" ]]; then
+    log_error "必须指定输入目录 --input_dir"
+    exit 1
+fi
+
+# 创建输出目录
+mkdir -p "$OUTPUT_DIR"
+mkdir -p logs
+
+log_info "启动 Text QA Generation Pipeline"
+log_info "运行模式: $MODE"
+log_info "输入目录: $INPUT_DIR"
+log_info "输出目录: $OUTPUT_DIR"
+log_info "模型类型: $MODEL_TYPE"
+
+# 检查依赖
+check_dependencies() {
+    log_step "检查依赖..."
+    
+    # 检查Python环境
+    if ! command -v python &> /dev/null; then
+        log_error "Python 未安装"
+        exit 1
+    fi
+    
+    # 检查必需的Python包
+    python -c "import asyncio, json, aiohttp" 2>/dev/null || {
+        log_error "缺少必需的Python包，请运行: pip install -r requirements.txt"
+        exit 1
+    }
+    
+    # 检查本地模型服务
+    if [[ "$MODEL_TYPE" == "ollama" ]]; then
+        if ! curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
+            log_warning "Ollama服务未运行，请先启动: ollama serve"
+        else
+            log_success "Ollama服务运行正常"
+        fi
+    elif [[ "$MODEL_TYPE" == "vllm" ]]; then
+        if ! curl -s http://localhost:8000/health >/dev/null 2>&1; then
+            log_warning "vLLM服务未运行"
+        else
+            log_success "vLLM服务运行正常"
+        fi
+    fi
+    
+    log_success "依赖检查完成"
+}
+
+# 文本模式处理
+run_text_mode() {
+    log_step "执行文本问答生成..."
+    
+    # 检查输入目录
+    if [[ ! -d "$INPUT_DIR" ]]; then
+        log_error "输入目录不存在: $INPUT_DIR"
+        exit 1
+    fi
+    
+    # 文本召回和处理
+    log_info "步骤 1/4: 文本处理和召回"
+    python text_main_batch_inference.py \
+        --txt_path "$INPUT_DIR" \
+        --storage_folder "$OUTPUT_DIR" \
+        --index $INDEX \
+        --parallel_batch_size $BATCH_SIZE \
+        --selected_task_number $DEFAULT_MAX_TASKS \
+        --model_type $MODEL_TYPE \
+        --model_name "$MODEL_NAME"
+    
+    # 数据清洗
+    log_info "步骤 2/4: 数据清洗"
+    python clean_text_data.py \
+        --input_file "$OUTPUT_DIR/total_response.pkl" \
+        --output_file "$OUTPUT_DIR"
+    
+    # QA生成
+    log_info "步骤 3/4: QA对生成"
+    python text_qa_generation.py \
+        --file_path "$OUTPUT_DIR/total_response.json" \
+        --index $INDEX \
+        --pool_size $POOL_SIZE \
+        --output_file "$OUTPUT_DIR" \
+        --model_type $MODEL_TYPE \
+        --model_name "$MODEL_NAME" \
+        --domain "$DOMAIN"
+    
+    # 质量检查
+    if [[ "$ENHANCED_QUALITY" == true ]]; then
+        log_info "步骤 4/4: 增强质量检查"
+        python text_qa_generation.py \
+            --file_path "$OUTPUT_DIR/results_$INDEX.json" \
+            --output_file "$OUTPUT_DIR" \
+            --check_task True \
+            --enhanced_quality True \
+            --quality_threshold $QUALITY_THRESHOLD \
+            --model_type $MODEL_TYPE
+    else
+        log_info "跳过质量检查"
+    fi
+    
+    log_success "文本模式处理完成"
+}
+
+# PDF模式处理
+run_pdf_mode() {
+    log_step "执行PDF多模态处理..."
+    
+    # PDF处理
+    log_info "步骤 1/5: PDF文档处理"
+    python MultiModal/pdf_processor.py \
+        --input "$INPUT_DIR" \
+        --output "$OUTPUT_DIR/processed" \
+        --markdown
+    
+    # 多模态召回
+    log_info "步骤 2/5: 多模态召回"
+    python text_main_batch_inference.py \
+        --pdf_path "$OUTPUT_DIR/processed" \
+        --storage_folder "$OUTPUT_DIR" \
+        --index $INDEX \
+        --parallel_batch_size $BATCH_SIZE \
+        --model_type $MODEL_TYPE
+    
+    # 数据清洗
+    log_info "步骤 3/5: 数据清洗"
+    python clean_text_data.py \
+        --input_file "$OUTPUT_DIR/total_response.pkl" \
+        --output_file "$OUTPUT_DIR"
+    
+    # QA生成
+    log_info "步骤 4/5: 多模态QA生成"
+    python text_qa_generation.py \
+        --file_path "$OUTPUT_DIR/total_response.json" \
+        --index $INDEX \
+        --pool_size $POOL_SIZE \
+        --output_file "$OUTPUT_DIR" \
+        --model_type $MODEL_TYPE \
+        --domain "$DOMAIN" \
+        --multimodal True
+    
+    # 质量检查
+    if [[ "$ENHANCED_QUALITY" == true ]]; then
+        log_info "步骤 5/5: 质量检查"
+        python model_rewrite/data_label.py \
+            --data-path "$OUTPUT_DIR/results_$INDEX.json" \
+            --output-path "$OUTPUT_DIR/quality_report.json" \
+            --model-type $MODEL_TYPE
+    fi
+    
+    log_success "PDF模式处理完成"
+}
+
+# 数据改写模式
+run_rewrite_mode() {
+    log_step "执行数据改写和增强..."
+    
+    if [[ ! -f "$INPUT_DIR" ]]; then
+        log_error "输入文件不存在: $INPUT_DIR"
+        exit 1
+    fi
+    
+    local template_type="basic"
+    if [[ "$PROFESSIONAL" == true ]]; then
+        template_type="professional"
+    fi
+    
+    log_info "使用模板类型: $template_type"
+    
+    python model_rewrite/data_generation.py \
+        --data-path "$INPUT_DIR" \
+        --output-path "$OUTPUT_DIR/rewritten_qa.json" \
+        --concurrency $DEFAULT_CONCURRENCY \
+        --model-type $MODEL_TYPE \
+        --model-name "$MODEL_NAME" \
+        --template-type $template_type
+    
+    log_success "数据改写完成"
+}
+
+# 质量检查模式
+run_quality_check_mode() {
+    log_step "执行质量检查..."
+    
+    if [[ ! -f "$INPUT_DIR" ]]; then
+        log_error "输入文件不存在: $INPUT_DIR"
+        exit 1
+    fi
+    
+    python model_rewrite/data_label.py \
+        --data-path "$INPUT_DIR" \
+        --output-path "$OUTPUT_DIR/quality_report.json" \
+        --concurrency $DEFAULT_CONCURRENCY \
+        --model-type $MODEL_TYPE \
+        --model-name "$MODEL_NAME"
+    
+    log_success "质量检查完成"
+}
+
+# 多模态模式处理
+run_multimodal_mode() {
+    log_step "执行多模态问答生成..."
+    
+    # 组合PDF和文本处理
+    run_pdf_mode
+    
+    # 如果启用改写，执行改写
+    if [[ "$REWRITE" == true ]]; then
+        log_info "执行数据改写增强..."
+        run_rewrite_mode
+    fi
+    
+    log_success "多模态模式处理完成"
+}
+
+# 显示结果统计
+show_results() {
+    log_step "处理结果统计"
+    
+    if [[ -f "$OUTPUT_DIR/results_$INDEX.json" ]]; then
+        local qa_count=$(python -c "import json; data=json.load(open('$OUTPUT_DIR/results_$INDEX.json')); print(len(data) if isinstance(data, list) else sum(len(item.get('qa_pairs', [])) for item in data))")
+        log_success "生成QA对数量: $qa_count"
+    fi
+    
+    if [[ -f "$OUTPUT_DIR/quality_report.json" ]]; then
+        local pass_rate=$(python -c "import json; data=json.load(open('$OUTPUT_DIR/quality_report.json')); print(f\"{data.get('summary', {}).get('pass_rate', 0)*100:.1f}%\")")
+        log_success "质量通过率: $pass_rate"
+    fi
+    
+    if [[ -f "$OUTPUT_DIR/rewritten_qa.json" ]]; then
+        local rewrite_count=$(python -c "import json; data=json.load(open('$OUTPUT_DIR/rewritten_qa.json')); print(len(data))")
+        log_success "改写数据数量: $rewrite_count"
+    fi
+    
+    log_info "输出目录: $OUTPUT_DIR"
+    log_info "日志文件: logs/"
+}
+
+# 主执行流程
+main() {
+    # 记录开始时间
+    local start_time=$(date +%s)
+    
+    # 检查依赖
+    check_dependencies
+    
+    # 根据模式执行相应处理
+    case $MODE in
+        text)
+            run_text_mode
+            ;;
+        pdf)
+            run_pdf_mode
+            ;;
+        multimodal)
+            run_multimodal_mode
+            ;;
+        rewrite)
+            run_rewrite_mode
+            ;;
+        quality_check)
+            run_quality_check_mode
             ;;
         *)
-            # Continue with normal execution
+            log_error "不支持的运行模式: $MODE"
+            show_help
+            exit 1
             ;;
     esac
     
-    # Run the pipeline
-    display_config
-    check_prerequisites
-    validate_model_path
-    create_directories
-    check_input_files
+    # 显示结果
+    show_results
     
-    # Step 1: Text Processing and Initial Analysis
-    if ! run_step "Processing text files" "1" \
-        "python text_main_batch_inference.py \
-            --txt_path '$INPUT_DIR' \
-            --storage_folder '$OUTPUT_DIR' \
-            --index 9 \
-            --parallel_batch_size '$BATCH_SIZE' \
-            --selected_task_number '$TASK_NUMBER'"; then
-        exit 1
-    fi
+    # 计算运行时间
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    local hours=$((duration / 3600))
+    local minutes=$(((duration % 3600) / 60))
+    local seconds=$((duration % 60))
     
-    # Step 2: Data Cleaning
-    if ! run_step "Cleaning and formatting data" "2" \
-        "python clean_text_data.py \
-            --input_file '$OUTPUT_DIR/total_response.pkl' \
-            --output_file '$OUTPUT_DIR'"; then
-        exit 1
-    fi
-    
-    # Step 3: QA Generation
-    if ! run_step "Generating QA pairs" "3" \
-        "python text_qa_generation.py \
-            --file_path '$OUTPUT_DIR/total_response.json' \
-            --index 343 \
-            --pool_size '$POOL_SIZE' \
-            --output_file '$OUTPUT_DIR' \
-            --ark_url '$ARK_URL' \
-            --api_key '$ARK_API_KEY' \
-            --model '$MODEL_PATH'"; then
-        exit 1
-    fi
-    
-    # Step 4: Generate final report
-    generate_final_report
-    
-    print_success "Pipeline completed successfully!"
-    print_info "Results saved to: $OUTPUT_DIR"
-    
-    # Step 5: Optional Quality Check
-    ask_quality_check
-    
-    echo ""
-    echo -e "${GREEN}============================================${NC}"
-    echo -e "${GREEN}🎉 All tasks completed successfully!${NC}"
-    echo -e "${GREEN}============================================${NC}"
-    echo ""
-    print_info "Next steps:"
-    echo "  • Review the generated QA pairs in $OUTPUT_DIR"
-    echo "  • Check quality reports if you ran quality check"
-    echo "  • Consider running human review for critical applications"
-    echo ""
+    log_success "Pipeline 执行完成！"
+    log_info "总耗时: ${hours}h ${minutes}m ${seconds}s"
 }
 
-# Run main function with all arguments
+# 错误处理
+trap 'log_error "Pipeline 执行失败，请检查错误日志"; exit 1' ERR
+
+# 执行主函数
 main "$@"
