@@ -9,9 +9,11 @@ import random
  
 
 
-async def proccess_folders(folders,pdf_path,temporary_folder,index=9,maximum_tasks = 20,selected_task_number = 500):
+async def proccess_folders(folders,pdf_path,temporary_folder,index=9,maximum_tasks = 20,selected_task_number = 500, read_hist=False, storage_folder=None):
     total_tasks = []
-    if args.read_hist and os.path.exists(os.path.join(storage_folder, "total_response.json")):
+    if storage_folder is None:
+        storage_folder = "/mnt/workspace/MLLM/zc/tclreasoning/data/100TestOutputt"
+    if read_hist and os.path.exists(os.path.join(storage_folder, "total_response.json")):
         print(f"Reading history data from {storage_folder}/total_responses.json")
         history_data = json.load(open(os.path.join(storage_folder, "total_response.json"), "r", encoding="utf-8"))
         img_lists = [example["image_path"] for example in history_data if "image_path" in example]
@@ -21,7 +23,7 @@ async def proccess_folders(folders,pdf_path,temporary_folder,index=9,maximum_tas
     else:
         img_lists = []
     print(f"img_lists: {len(img_lists) if img_lists else 'None'}")
-    asyncio.sleep(5)
+    await asyncio.sleep(5)
     total_responses = []
     for folder in folders:
         folder_path = os.path.join(pdf_path, folder)
@@ -67,6 +69,64 @@ async def proccess_folders(folders,pdf_path,temporary_folder,index=9,maximum_tas
     return total_responses
 
 
+async def main_async(**kwargs):
+    """
+    Async main function for doubao batch inference
+    """
+    # Set default arguments if not provided
+    index = kwargs.get('index', 43)
+    parallel_batch_size = kwargs.get('parallel_batch_size', 100)
+    pdf_path = kwargs.get('pdf_path', "/mnt/workspace/MLLM/zc/tclreasoning/data/100Test")
+    storage_folder = kwargs.get('storage_folder', "/mnt/workspace/MLLM/zc/tclreasoning/data/100TestOutputt")
+    temporary_folder = kwargs.get('temporary_folder', "TEMP")
+    selected_task_number = kwargs.get('selected_task_number', 1000)
+    read_hist = kwargs.get('read_hist', False)
+    
+    # Create storage folder if it doesn't exist
+    os.makedirs(storage_folder, exist_ok=True)
+    
+    # Get folders to process
+    folders = os.listdir(pdf_path)
+    
+    # Process folders
+    final_results = await proccess_folders(
+        folders, pdf_path, temporary_folder, 
+        index=index, maximum_tasks=parallel_batch_size,
+        selected_task_number=selected_task_number,
+        read_hist=read_hist, storage_folder=storage_folder
+    )
+    
+    # Save results
+    with open(os.path.join(storage_folder, "total_response.pkl"), "wb") as f:
+        if read_hist and os.path.exists(os.path.join(storage_folder, "total_response.json")):
+            history_data = json.load(open(os.path.join(storage_folder, "total_response.json"), "r", encoding="utf-8"))
+            final_results.extend(history_data)
+        pkl.dump(final_results, f)
+    
+    return final_results
+
+
+def main(**kwargs):
+    """
+    Main function for doubao batch inference
+    """
+    try:
+        # Try to get the current event loop
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If we're already in an event loop, create a task
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, main_async(**kwargs))
+                return future.result()
+        else:
+            # If no event loop is running, use asyncio.run
+            return asyncio.run(main_async(**kwargs))
+    except RuntimeError:
+        # If no event loop exists, use asyncio.run
+        return asyncio.run(main_async(**kwargs))
+
+
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Process some integers.")
@@ -91,7 +151,7 @@ if __name__ == "__main__":
     total_responses = []
     os.makedirs(storage_folder, exist_ok=True)
     final_results = asyncio.run(proccess_folders(folders,pdf_path,temporary_folder, index=index, maximum_tasks=parallel_batch_size,
-        selected_task_number=selected_task_number))
+        selected_task_number=selected_task_number, read_hist=args.read_hist, storage_folder=storage_folder))
     f = open(os.path.join(storage_folder, "total_response.pkl"), "wb")
     if args.read_hist:
         history_data = json.load(open(storage_folder+"/total_response.json", "r", encoding="utf-8"))

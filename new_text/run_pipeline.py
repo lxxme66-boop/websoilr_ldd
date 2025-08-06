@@ -23,6 +23,9 @@ from typing import Dict, List, Optional, Union
 import time
 from datetime import datetime
 
+# 添加父目录到Python路径，以便导入核心模块
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # 导入核心模块
 from doubao_main_batch_inference import main as retrieval_main
 from clean_data import main as cleaning_main

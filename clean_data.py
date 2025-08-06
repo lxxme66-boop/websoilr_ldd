@@ -61,6 +61,27 @@ def clean_process(input_file,output_file,copy_parsed_pdf=False,):
         json.dump(output_json, f, ensure_ascii=False, indent=4)
         print("The number of responses is {}".format(len(output_json)))
 
+
+def main(**kwargs):
+    """
+    Main function for data cleaning
+    """
+    # Set default arguments if not provided
+    input_file = kwargs.get('input_file', "/mnt/workspace/MLLM/zc/tclreasoning/data/100TestOutputt/total_response.pkl")
+    output_file = kwargs.get('output_file', "/mnt/workspace/MLLM/zc/tclreasoning/data/100TestOutputt")
+    copy_parsed_pdf = kwargs.get('copy_parsed_pdf', False)
+    
+    # Create output folder if it doesn't exist
+    if not os.path.exists(output_file):
+        os.makedirs(output_file)
+    
+    # Run the cleaning process
+    clean_process(input_file, output_file, copy_parsed_pdf=copy_parsed_pdf)
+    print(f"Cleaned data saved to {output_file}/total_response.json")
+    
+    return os.path.join(output_file, "total_response.json")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some integers.")
     parser.add_argument("--input_file", type=str, \
