@@ -24,7 +24,7 @@ import time
 from datetime import datetime
 
 # 导入核心模块
-from doubao_main_batch_inference import main as retrieval_main
+from text_main_batch_inference_enhanced import main as retrieval_main
 from clean_data import main as cleaning_main
 from text_qa_generation import main as qa_generation_main
 from TextQA.enhanced_quality_checker import TextQAQualityIntegrator
