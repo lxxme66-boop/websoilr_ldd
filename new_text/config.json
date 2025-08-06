@@ -25,7 +25,7 @@
     "max_retries": 3,
     "retry_delay": 1,
     "use_local_models": true,
-    "local_model_priority": ["ollama", "vllm", "transformers"]
+    "local_model_priority": ["skywork", "ollama", "vllm", "transformers"]
   },
   
   "models": {
@@ -54,6 +54,14 @@
         "model_name": "qwen:7b",
         "timeout": 300,
         "models_available": ["llama2", "codellama", "mistral", "qwen", "deepseek-coder", "qwen:7b", "qwen:14b"]
+      },
+      "skywork": {
+        "enabled": true,
+        "base_url": "http://localhost:8000",
+        "model_path": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
+        "timeout": 600,
+        "gpu_memory_utilization": 0.9,
+        "max_model_len": 4096
       },
       "vllm": {
         "enabled": false,

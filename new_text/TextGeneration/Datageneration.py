@@ -24,6 +24,7 @@ try:
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from LocalModels.ollama_client import OllamaClient
+    from LocalModels.skywork_client import SkyworkClient
     LOCAL_MODEL_AVAILABLE = True
 except ImportError:
     LOCAL_MODEL_AVAILABLE = False
@@ -148,6 +149,71 @@ async def input_text_process(text_content, source_file, chunk_index=0, total_chu
     # Check if we should use local models
     if use_local_models and LOCAL_MODEL_AVAILABLE:
         logger.info("Using local model for text processing")
+        
+        # Try Skywork first if enabled
+        skywork_config = config.get('models', {}).get('local_models', {}).get('skywork', {})
+        if skywork_config.get('enabled', False):
+            try:
+                logger.info("Trying Skywork model...")
+                skywork_client = SkyworkClient(
+                    base_url=skywork_config.get('base_url', 'http://localhost:8000'),
+                    model_path=skywork_config.get('model_path', '/mnt/storage/models/Skywork/Skywork-R1V3-38B'),
+                    timeout=skywork_config.get('timeout', 600)
+                )
+                
+                # Check if vLLM service is available
+                if skywork_client.check_connection():
+                    logger.info("Skywork/vLLM service is available")
+                    
+                    # Use Skywork model for generation
+                    user_prompt = user_prompts[prompt_index]
+                    
+                    # Format the prompt
+                    if '{markdown_content}' in user_prompt:
+                        formatted_prompt = user_prompt.format(
+                            markdown_content=text_content,
+                            source_file=source_file,
+                            chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
+                        )
+                    elif '{text_content}' in user_prompt:
+                        formatted_prompt = user_prompt.format(
+                            text_content=text_content,
+                            source_file=source_file,
+                            chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
+                        )
+                    else:
+                        formatted_prompt = user_prompt
+                    
+                    # Create messages for chat
+                    messages = [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": formatted_prompt}
+                    ]
+                    
+                    # Generate response using Skywork
+                    response_content = await skywork_client.chat(messages, temperature=0.8, max_tokens=4096)
+                    
+                    if response_content:
+                        result = {
+                            "content": response_content,
+                            "source_file": source_file,
+                            "chunk_index": chunk_index,
+                            "total_chunks": total_chunks,
+                            "text_content": text_content[:500] + "..." if len(text_content) > 500 else text_content,
+                            "model_used": "skywork/" + skywork_config.get('model_path', 'Skywork-R1V3-38B').split('/')[-1]
+                        }
+                        logger.info(f"Successfully processed chunk {chunk_index + 1}/{total_chunks} from {source_file} using Skywork model")
+                        return result
+                    else:
+                        logger.error("Failed to get response from Skywork model")
+                        raise Exception("No response from Skywork model")
+                else:
+                    logger.warning("Skywork/vLLM service not available, trying Ollama...")
+            except Exception as e:
+                logger.error(f"Error using Skywork model: {e}")
+                logger.info("Falling back to Ollama...")
+        
+        # Try Ollama if Skywork is not available or failed
         try:
             ollama_client = OllamaClient(
                 base_url=local_model_config.get('base_url', 'http://localhost:11434'),
