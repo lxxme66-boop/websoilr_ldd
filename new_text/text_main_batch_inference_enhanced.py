@@ -79,29 +79,34 @@ async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_
         print(f"处理完成: {len(pdf_results)} 个PDF文件, {len(txt_results)} 个文本文件")
         
         # 转换为任务格式
+        task_metadata = []  # 保存任务对应的元数据
         for data in retrieval_data:
             if data['source_file'] not in processed_files:
-                # 创建任务
-                try:
-                    task = await input_text_process(data['content'])
-                except Exception as e:
-                    print(f"处理任务失败: {e}")
-                    task = None
+                # 创建任务（不要await，保留为协程）
+                task = input_text_process(
+                    data['content'], 
+                    data['source_file'],
+                    chunk_index=0,
+                    total_chunks=1,
+                    prompt_index=index
+                )
                     
                 if task:
                     total_tasks.append(task)
+                    task_metadata.append(data)  # 保存对应的元数据
                     
                     if len(total_tasks) >= maximum_tasks:
                         print(f"Total tasks {len(total_tasks)} exceeds the maximum_tasks {maximum_tasks}, processing batch...")
                         batch_responses = await asyncio.gather(*total_tasks)
                         # Filter out None responses and add metadata
                         for i, response in enumerate(batch_responses):
-                            if response is not None:
-                                response['source_file'] = retrieval_data[i]['source_file']
-                                response['file_type'] = retrieval_data[i]['file_type']
+                            if response is not None and isinstance(response, dict):
+                                response['source_file'] = task_metadata[i]['source_file']
+                                response['file_type'] = task_metadata[i]['file_type']
                                 total_responses.append(response)
                         
                         total_tasks = []  # reset the tasks list
+                        task_metadata = []  # reset metadata list
                         
                         # Save batch
                         os.makedirs(os.path.join(storage_folder, temporary_folder), exist_ok=True)
@@ -110,6 +115,16 @@ async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_
                             encoding="utf-8") as f:
                             json.dump(batch_responses, f, ensure_ascii=False, indent=4)
                             print(f"Batch {batch_num} responses saved")
+        
+        # 处理剩余的任务
+        if total_tasks:
+            print(f"Processing remaining {len(total_tasks)} tasks...")
+            batch_responses = await asyncio.gather(*total_tasks)
+            for i, response in enumerate(batch_responses):
+                if response is not None and isinstance(response, dict):
+                    response['source_file'] = task_metadata[i]['source_file']
+                    response['file_type'] = task_metadata[i]['file_type']
+                    total_responses.append(response)
         
     else:
         # 原有的处理逻辑（仅处理txt文件）
@@ -154,13 +169,15 @@ async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_
                     encoding="utf-8") as f:
                     json.dump(batch_responses, f, ensure_ascii=False, indent=4)
                     print(f"Batch {len(total_responses)//maximum_tasks + 1} responses saved to {storage_folder}/{temporary_folder}/batch_{len(total_responses)//maximum_tasks + 1}.json")
-                
-        # Process remaining tasks
-    if total_tasks:
-        batch_responses = await asyncio.gather(*total_tasks)
-        batch_responses = [response for response in batch_responses if response is not None]
-        total_responses.extend(batch_responses)
         
+        # 处理原有逻辑的剩余任务
+        if total_tasks:
+            print(f"Processing remaining {len(total_tasks)} tasks...")
+            batch_responses = await asyncio.gather(*total_tasks)
+            batch_responses = [response for response in batch_responses if response is not None]
+            total_responses.extend(batch_responses)
+                
+    # 注意：剩余任务的处理已经在上面的增强处理器和原有处理逻辑中完成了
     return total_responses
 
 

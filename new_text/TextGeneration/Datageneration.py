@@ -236,3 +236,79 @@ def merge_chunk_responses(responses):
         merged_responses.append(merged_response)
     
     return merged_responses
+
+
+async def process_folder_async(folder_path, prompt_index=9, max_concurrent=5):
+    """
+    异步处理文件夹中的所有文本文件
+    """
+    tasks = []
+    
+    # 遍历文件夹中的所有文件
+    for root, dirs, files in os.walk(folder_path):
+        for file in files:
+            if file.endswith('.txt'):
+                file_path = os.path.join(root, file)
+                # 使用parse_txt处理文件
+                file_tasks = await parse_txt(file_path, prompt_index)
+                tasks.extend(file_tasks)
+    
+    # 限制并发数量
+    results = []
+    for i in range(0, len(tasks), max_concurrent):
+        batch = tasks[i:i + max_concurrent]
+        batch_results = await asyncio.gather(*batch, return_exceptions=True)
+        # 过滤掉异常结果
+        for result in batch_results:
+            if not isinstance(result, Exception) and result is not None:
+                results.append(result)
+            elif isinstance(result, Exception):
+                logger.error(f"Task failed with error: {result}")
+    
+    return results
+
+
+async def process_folder_async_with_history(folder_path, history_file=None, prompt_index=9, max_concurrent=5):
+    """
+    异步处理文件夹中的文本文件，支持历史记录
+    """
+    processed_files = set()
+    
+    # 读取历史记录
+    if history_file and os.path.exists(history_file):
+        try:
+            with open(history_file, 'r', encoding='utf-8') as f:
+                history_data = json.load(f)
+                for item in history_data:
+                    if 'source_file' in item:
+                        processed_files.add(item['source_file'])
+            logger.info(f"Loaded {len(processed_files)} processed files from history")
+        except Exception as e:
+            logger.error(f"Error loading history file: {e}")
+    
+    tasks = []
+    
+    # 遍历文件夹中的所有文件
+    for root, dirs, files in os.walk(folder_path):
+        for file in files:
+            if file.endswith('.txt') and file not in processed_files:
+                file_path = os.path.join(root, file)
+                # 使用parse_txt处理文件
+                file_tasks = await parse_txt(file_path, prompt_index)
+                tasks.extend(file_tasks)
+    
+    logger.info(f"Found {len(tasks)} new tasks to process")
+    
+    # 限制并发数量
+    results = []
+    for i in range(0, len(tasks), max_concurrent):
+        batch = tasks[i:i + max_concurrent]
+        batch_results = await asyncio.gather(*batch, return_exceptions=True)
+        # 过滤掉异常结果
+        for result in batch_results:
+            if not isinstance(result, Exception) and result is not None:
+                results.append(result)
+            elif isinstance(result, Exception):
+                logger.error(f"Task failed with error: {result}")
+    
+    return results
