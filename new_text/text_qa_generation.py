@@ -158,3 +158,80 @@ def generate_qa_statistics(qa_data):
             stats['question_type_percentages'][q_type] = f"{percentage:.1f}%"
     
     return stats
+
+
+async def main(index=343, file_path=None, pool_size=100, output_file=None, 
+              ark_url="http://0.0.0.0:8080/v1", api_key="ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b",
+              model="/mnt/storage/models/Skywork/Skywork-R1V3-38B", 
+              check_task=False, user_stream=False, enhanced_quality=False, **kwargs):
+    """
+    Main async function for QA generation
+    
+    Args:
+        index: Index for the QA generation task
+        file_path: Path to input JSON file
+        pool_size: Number of parallel tasks
+        output_file: Output directory for results
+        ark_url: ARK API URL
+        api_key: ARK API key
+        model: Model to use for QA generation
+        check_task: Whether to check data quality
+        user_stream: Whether to use streaming
+        enhanced_quality: Whether to use enhanced quality checking
+        
+    Returns:
+        List of generated QA pairs
+    """
+    if file_path is None:
+        file_path = "/workspace/text_qa_generation/data/output/total_response.json"
+    if output_file is None:
+        output_file = "/workspace/text_qa_generation/data/output"
+    
+    output_file_path = os.path.join(output_file, f"results_{index}.json")
+    
+    # Generate QA pairs
+    results = await get_total_responses(index, file_path, pool_size, stream=user_stream)
+    
+    # Save results
+    with open(output_file_path, 'w', encoding='utf-8') as f:
+        json.dump(results, f, ensure_ascii=False, indent=4)
+    print(f"Generated {len(results)} QA pairs, saved to {output_file_path}")
+    
+    # Generate statistics
+    stats = generate_qa_statistics(results)
+    stats_file = output_file_path.replace('.json', '_stats.json')
+    with open(stats_file, 'w', encoding='utf-8') as f:
+        json.dump(stats, f, ensure_ascii=False, indent=4)
+    print(f"Statistics saved to {stats_file}")
+    
+    # Optional quality checking
+    if enhanced_quality:
+        print("使用增强质量检查...")
+        config = {
+            "api": {
+                "ark_url": ark_url,
+                "api_key": api_key
+            },
+            "models": {
+                "quality_checker_model": {
+                    "path": model
+                }
+            },
+            "quality_control": {
+                "enhanced_quality_check": {
+                    "quality_threshold": kwargs.get('quality_threshold', 0.7),
+                    "batch_size": kwargs.get('batch_size', 50),
+                    "max_retries": kwargs.get('max_retries', 3)
+                }
+            }
+        }
+        
+        integrator = TextQAQualityIntegrator(config)
+        quality_report = await integrator.enhanced_quality_check(
+            qa_file_path=output_file_path,
+            output_dir=output_file,
+            quality_threshold=config['quality_control']['enhanced_quality_check']['quality_threshold']
+        )
+        print(f"质量检查完成，通过率: {quality_report.get('pass_rate', 0):.2%}")
+    
+    return results

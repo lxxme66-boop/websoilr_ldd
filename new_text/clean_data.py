@@ -78,3 +78,24 @@ if __name__ == "__main__":
         os.makedirs(new_folder)
     clean_process(input_file, new_folder, copy_parsed_pdf=copy_parsed_pdf)
     print(f"Cleaned data saved to {new_folder}/total_response.json")
+
+async def main(input_file, output_dir, copy_parsed_pdf=False):
+    """
+    Main async function for data cleaning
+    
+    Args:
+        input_file: Path to input pickle file
+        output_dir: Output directory for cleaned data
+        copy_parsed_pdf: Whether to copy parsed PDF files
+    
+    Returns:
+        Path to cleaned output file
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    clean_process(input_file, output_dir, copy_parsed_pdf=copy_parsed_pdf)
+    output_file = os.path.join(output_dir, "total_response.json")
+    print(f"Cleaned data saved to {output_file}")
+    
+    return output_file
