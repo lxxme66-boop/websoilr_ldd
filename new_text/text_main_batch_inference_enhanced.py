@@ -8,17 +8,39 @@ import os
 
 # Import only what we need from Datageneration
 try:
-    from TextGeneration.Datageneration import process_folder_async, process_folder_async_with_history
+    from TextGeneration.Datageneration import process_folder_async, process_folder_async_with_history, parse_txt, input_text_process
 except ImportError as e:
     print(f"Warning: Could not import from TextGeneration.Datageneration: {e}")
-    # Define dummy functions if imports fail
-    async def process_folder_async(*args, **kwargs):
-        print("Error: process_folder_async not available")
-        return []
-    
-    async def process_folder_async_with_history(*args, **kwargs):
-        print("Error: process_folder_async_with_history not available")
-        return []
+    # Try alternative import
+    try:
+        from TextGeneration.Datageneration import parse_txt, input_text_process
+        print("Successfully imported parse_txt and input_text_process")
+        # Define dummy functions for missing imports
+        async def process_folder_async(*args, **kwargs):
+            print("Error: process_folder_async not available")
+            return []
+        
+        async def process_folder_async_with_history(*args, **kwargs):
+            print("Error: process_folder_async_with_history not available")
+            return []
+    except ImportError as e2:
+        print(f"Error: Could not import parse_txt and input_text_process: {e2}")
+        # Define all dummy functions if imports fail
+        async def process_folder_async(*args, **kwargs):
+            print("Error: process_folder_async not available")
+            return []
+        
+        async def process_folder_async_with_history(*args, **kwargs):
+            print("Error: process_folder_async_with_history not available")
+            return []
+        
+        async def parse_txt(*args, **kwargs):
+            print("Error: parse_txt not available")
+            return []
+        
+        async def input_text_process(*args, **kwargs):
+            print("Error: input_text_process not available")
+            return None
 
 async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_tasks=20, selected_task_number=500, storage_folder=None, read_hist=False):
     total_tasks = []

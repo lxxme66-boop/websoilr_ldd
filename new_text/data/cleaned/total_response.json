@@ -1,0 +1,14 @@
+[
+    {
+        "content": "Mock QA for test.txt chunk 1/1:\nQ: What is discussed in this text?\nA: The text discusses semiconductor technology and related concepts.",
+        "source_file": "test.txt",
+        "text_content": "这是一个测试文档，用于测试文本召回功能。半导体是现代电子技术的基础。\n",
+        "qa_pairs": [
+            {
+                "question": "What is the main topic of this text?",
+                "answer": "The text discusses semiconductor technology.",
+                "reasoning": "Based on the content analysis."
+            }
+        ]
+    }
+]
