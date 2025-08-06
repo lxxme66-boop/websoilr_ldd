@@ -24,7 +24,7 @@
     "timeout": 600,
     "max_retries": 3,
     "retry_delay": 1,
-    "use_local_models": false,
+    "use_local_models": true,
     "local_model_priority": ["ollama", "vllm", "transformers"]
   },
   
