@@ -1,15 +1,49 @@
 {
     "models": {
         "qa_generator_model": {
+            "type": "openai_compatible",
             "path": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
             "max_length": 4096,
             "temperature": 0.8,
             "top_p": 0.9
+        },
+        "local_models": {
+            "ollama": {
+                "enabled": false,
+                "base_url": "http://localhost:11434",
+                "model_name": "llama2",
+                "timeout": 300,
+                "models_available": ["llama2", "codellama", "mistral", "qwen", "deepseek-coder"]
+            },
+            "vllm": {
+                "enabled": false,
+                "base_url": "http://localhost:8000",
+                "model_name": "Qwen/Qwen2-7B-Instruct",
+                "timeout": 300
+            },
+            "transformers": {
+                "enabled": false,
+                "model_name": "Qwen/Qwen2-7B-Instruct",
+                "device": "auto",
+                "torch_dtype": "auto",
+                "load_in_4bit": false,
+                "load_in_8bit": false
+            }
+        },
+        "multimodal_models": {
+            "vision_model": {
+                "type": "openai_compatible",
+                "path": "gpt-4-vision-preview",
+                "supports_images": true,
+                "max_image_size": "1024x1024"
+            }
         }
     },
     "api": {
         "ark_url": "http://0.0.0.0:8080/v1",
-        "api_key": "ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b"
+        "api_key": "ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b",
+        "use_local_models": false,
+        "local_model_priority": ["ollama", "vllm", "transformers"]
     },
     "question_generation": {
         "question_types": ["factual", "comparison", "reasoning", "open_ended"],
@@ -25,7 +59,9 @@
             "comparison": 44,
             "reasoning": 45,
             "open_ended": 46,
-            "comprehensive": 343
+            "comprehensive": 343,
+            "multimodal": [343, 3431, 3432],
+            "professional": [34, 35, 36, 37, 38, 39, 40]
         }
     },
     "processing": {
@@ -33,7 +69,21 @@
         "chunk_overlap": 200,
         "batch_size": 50,
         "pool_size": 100,
-        "max_tasks": 1000
+        "max_tasks": 1000,
+        "multimodal": {
+            "enabled": true,
+            "pdf_processing": {
+                "extract_images": true,
+                "extract_text": true,
+                "dpi": 200,
+                "image_format": "png"
+            },
+            "image_processing": {
+                "max_size": "1024x1024",
+                "formats": ["png", "jpg", "jpeg", "webp"],
+                "encode_base64": true
+            }
+        }
     },
     "quality_control": {
         "check_times": 5,
@@ -44,12 +94,47 @@
             "parallel_core": 10,
             "activate_stream": false,
             "quality_threshold": 0.7,
-            "verification_method": "dual_stage"
+            "verification_method": "dual_stage",
+            "use_multiple_models": false,
+            "quality_models": ["ollama", "api"]
         }
+    },
+    "professional_domains": {
+        "enabled": true,
+        "default_domain": "semiconductor",
+        "available_domains": [
+            "semiconductor",
+            "optics", 
+            "materials",
+            "physics",
+            "chemistry",
+            "electronics"
+        ],
+        "domain_specific_prompts": {
+            "semiconductor": [343, 3431, 3432],
+            "optics": [343, 3431, 3432],
+            "materials": [34, 35, 36]
+        }
+    },
+    "rewriting": {
+        "enabled": true,
+        "rewrite_ratio": 0.3,
+        "quality_improvement": true,
+        "professional_enhancement": true,
+        "template_types": ["basic", "advanced", "professional"],
+        "concurrency": 5
     },
     "output": {
         "formats": ["json", "csv"],
         "include_statistics": true,
-        "include_source_mapping": true
+        "include_source_mapping": true,
+        "separate_by_domain": true,
+        "include_images": true
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "logs/text_qa_generation.log",
+        "max_file_size": "10MB",
+        "backup_count": 5
     }
 }
