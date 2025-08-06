@@ -1,4 +1,5 @@
 from TextQA.dataargument import get_total_responses, check_data_quality
+from TextQA.enhanced_quality_checker import TextQAQualityIntegrator
 import asyncio
 import json
 import pandas as pd
@@ -23,6 +24,8 @@ if __name__ == "__main__":
     parser.add_argument("--check_indexes", type=tuple, default=(40, 37, 38), help="Indexes to check data quality for")
     parser.add_argument("--check_times", type=int, default=9, help="Number of times to check data quality")
     parser.add_argument("--user_stream", default=False, type=bool)
+    parser.add_argument("--enhanced_quality", type=bool, default=True, help="Use enhanced quality checking")
+    parser.add_argument("--quality_threshold", type=float, default=0.7, help="Quality threshold for enhanced checking")
     
     args = parser.parse_args()
     file_path = args.file_path
@@ -52,9 +55,54 @@ if __name__ == "__main__":
         model = args.model
         check_indexes = args.check_indexes
         check_times = args.check_times
-        # Apply different model to check the data quality
-        asyncio.run(check_data_quality(ark_url, api_key, model, output_file, check_indexes, 
-                                     pool_size=pool_size, check_times=check_times, stream=args.user_stream))
+        
+        if args.enhanced_quality:
+            # 使用增强质量检查
+            print("使用增强质量检查...")
+            
+            # 加载配置
+            with open('/workspace/text_qa_generation/config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            # 更新配置中的API信息
+            config['api']['ark_url'] = ark_url
+            config['api']['api_key'] = api_key
+            config['models']['qa_generator_model']['path'] = model
+            config['quality_control']['enhanced_quality_check']['quality_threshold'] = args.quality_threshold
+            
+            # 初始化增强质量检查器
+            integrator = TextQAQualityIntegrator(config)
+            
+            # 执行增强质量检查
+            quality_report = asyncio.run(integrator.enhanced_quality_check(
+                qa_file_path=output_file,
+                output_dir=args.output_file,
+                quality_threshold=args.quality_threshold
+            ))
+            
+            # 打印质量报告
+            print("\n=== 增强质量检查报告 ===")
+            print(f"总QA对数量: {quality_report['total_qa_pairs']}")
+            print(f"通过QA对数量: {quality_report['passed_qa_pairs']}")
+            print(f"通过率: {quality_report['pass_rate']:.2%}")
+            print(f"是否达到阈值 ({args.quality_threshold:.1%}): {'是' if quality_report['meets_threshold'] else '否'}")
+            
+            if 'statistics' in quality_report:
+                stats = quality_report['statistics']
+                print(f"\n统计信息:")
+                print(f"平均问题长度: {stats['avg_question_length']:.1f} 字符")
+                print(f"平均答案长度: {stats['avg_answer_length']:.1f} 字符")
+                
+                if stats['question_types_distribution']:
+                    print(f"\n问题类型分布:")
+                    for q_type, count in stats['question_types_distribution'].items():
+                        print(f"  - {q_type}: {count} 个")
+            
+        else:
+            # 使用原有的简化质量检查
+            print("使用原有质量检查...")
+            asyncio.run(check_data_quality(ark_url, api_key, model, output_file, check_indexes, 
+                                         pool_size=pool_size, check_times=check_times, stream=args.user_stream))
 
 
 def generate_qa_statistics(qa_data):

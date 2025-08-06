@@ -116,17 +116,35 @@ echo "Results saved to: $OUTPUT_DIR"
 echo "==================================="
 
 # Optional: Run quality check
+echo ""
 read -p "Do you want to run quality check? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "Running quality check..."
-    python text_qa_generation.py \
-        --file_path "$OUTPUT_DIR/results_343.json" \
-        --output_file "$OUTPUT_DIR" \
-        --check_task True \
-        --check_indexes "(40, 37, 38)" \
-        --check_times 5 \
-        --ark_url "$ARK_URL" \
-        --api_key "$ARK_API_KEY" \
-        --model "$MODEL_PATH"
+    echo ""
+    read -p "Use enhanced quality check? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "Running enhanced quality check..."
+        python text_qa_generation.py \
+            --file_path "$OUTPUT_DIR/results_343.json" \
+            --output_file "$OUTPUT_DIR" \
+            --check_task True \
+            --enhanced_quality True \
+            --quality_threshold 0.7 \
+            --ark_url "$ARK_URL" \
+            --api_key "$ARK_API_KEY" \
+            --model "$MODEL_PATH"
+    else
+        echo "Running standard quality check..."
+        python text_qa_generation.py \
+            --file_path "$OUTPUT_DIR/results_343.json" \
+            --output_file "$OUTPUT_DIR" \
+            --check_task True \
+            --enhanced_quality False \
+            --check_indexes "(40, 37, 38)" \
+            --check_times 5 \
+            --ark_url "$ARK_URL" \
+            --api_key "$ARK_API_KEY" \
+            --model "$MODEL_PATH"
+    fi
 fi

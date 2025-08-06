@@ -96,6 +96,42 @@ def test_qa_generation_module():
         return False
 
 
+def test_enhanced_quality_checker():
+    """Test the enhanced quality checker module"""
+    print("\n=== Testing Enhanced Quality Checker ===")
+    try:
+        from TextQA.enhanced_quality_checker import EnhancedQualityChecker, TextQAQualityIntegrator
+        
+        # Test integrator initialization
+        config = {
+            'api': {'api_key': 'test', 'ark_url': 'http://test'},
+            'models': {'qa_generator_model': {'path': 'test_model'}},
+            'quality_control': {'parallel_core': 2, 'activate_stream': False}
+        }
+        integrator = TextQAQualityIntegrator(config)
+        print("✓ Enhanced quality integrator initialization works")
+        
+        # Test quality checker initialization
+        checker = EnhancedQualityChecker(
+            api_key='test',
+            base_url='http://test',
+            model='test_model',
+            system_prompt='test prompt',
+            parallel_core=2
+        )
+        print("✓ Enhanced quality checker initialization works")
+        
+        # Test prompt templates
+        assert 'answer_generation' in checker.quality_check_prompts
+        assert 'answer_verification' in checker.quality_check_prompts
+        print("✓ Quality check prompt templates loaded")
+        
+        return True
+    except Exception as e:
+        print(f"✗ Enhanced quality checker test failed: {e}")
+        return False
+
+
 def test_file_structure():
     """Test if all required files and directories exist"""
     print("\n=== Testing File Structure ===")
@@ -205,7 +241,8 @@ def main():
         ("Sample Data", test_sample_data),
         ("TextGeneration Module", test_text_generation_module),
         ("Data Cleaning Module", test_data_cleaning_module),
-        ("QA Generation Module", test_qa_generation_module)
+        ("QA Generation Module", test_qa_generation_module),
+        ("Enhanced Quality Checker", test_enhanced_quality_checker)
     ]
     
     results = []
