@@ -24,7 +24,7 @@ import time
 from datetime import datetime
 
 # 导入核心模块
-from doubao_main_batch_inference import main as retrieval_main
+from text_main_batch_inference_enhanced import main as retrieval_main
 from clean_data import main as cleaning_main
 from text_qa_generation import main as qa_generation_main
 from TextQA.enhanced_quality_checker import TextQAQualityIntegrator
@@ -195,7 +195,14 @@ class IntegratedQAPipeline:
         
         try:
             # 调用召回模块
-            await retrieval_main(**retrieval_args)
+            await retrieval_main(
+                index=retrieval_args['index'],
+                parallel_batch_size=retrieval_args['parallel_batch_size'],
+                pdf_path=retrieval_args['pdf_path'],
+                storage_folder=retrieval_args['storage_folder'],
+                selected_task_number=retrieval_args['selected_task_number'],
+                read_hist=retrieval_args['read_hist']
+            )
             
             output_file = os.path.join(output_dir, 'total_response.pkl')
             logger.info(f"文本召回完成，输出: {output_file}")

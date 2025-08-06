@@ -77,6 +77,67 @@ async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_
     return total_responses
 
 
+async def main(index=43, parallel_batch_size=100, pdf_path=None, storage_folder=None, 
+              selected_task_number=1000, read_hist=False):
+    """
+    Main function for text retrieval processing
+    
+    Args:
+        index: Task index for processing
+        parallel_batch_size: Number of parallel tasks
+        pdf_path: Path to input files (can be PDF or text directory)
+        storage_folder: Output storage folder
+        selected_task_number: Number of tasks to select
+        read_hist: Whether to read history file
+    """
+    if pdf_path is None:
+        pdf_path = "/workspace/text_qa_generation/data/input_texts"
+    if storage_folder is None:
+        storage_folder = "/workspace/text_qa_generation/data/output"
+    
+    temporary_folder = "TEMP"
+    
+    # Create output directory
+    os.makedirs(storage_folder, exist_ok=True)
+    
+    # Get all txt files
+    if os.path.isdir(pdf_path):
+        files = [f for f in os.listdir(pdf_path) if f.endswith('.txt')]
+    else:
+        # Single file processing
+        files = [os.path.basename(pdf_path)]
+        pdf_path = os.path.dirname(pdf_path)
+    
+    # Set global args for backward compatibility
+    global args
+    args = type('Args', (), {
+        'index': index,
+        'parallel_batch_size': parallel_batch_size,
+        'txt_path': pdf_path,
+        'storage_folder': storage_folder,
+        'temporary_folder': temporary_folder,
+        'selected_task_number': selected_task_number,
+        'read_hist': read_hist
+    })()
+    
+    # Process files
+    final_results = await process_folders(files, pdf_path, temporary_folder, 
+                                        index=index, 
+                                        maximum_tasks=parallel_batch_size,
+                                        selected_task_number=selected_task_number)
+    
+    # Save results
+    output_file = os.path.join(storage_folder, "total_response.pkl")
+    with open(output_file, "wb") as f:
+        if read_hist and os.path.exists(os.path.join(storage_folder, "total_response.json")):
+            history_data = json.load(open(os.path.join(storage_folder, "total_response.json"), "r", encoding="utf-8"))
+            final_results.extend(history_data)
+        pkl.dump(final_results, f)
+    
+    print(f"Total {len(final_results)} responses saved to {output_file}")
+    return final_results
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process text files for QA generation.")
     parser.add_argument("--index", type=int, default=43, help="index for the task")
