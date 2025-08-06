@@ -1,0 +1,48 @@
+{
+    "models": {
+        "qa_generator_model": {
+            "path": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
+            "max_length": 4096,
+            "temperature": 0.8,
+            "top_p": 0.9
+        }
+    },
+    "api": {
+        "ark_url": "http://0.0.0.0:8080/v1",
+        "api_key": "ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b"
+    },
+    "question_generation": {
+        "question_types": ["factual", "comparison", "reasoning", "open_ended"],
+        "question_type_ratios": {
+            "factual": 0.15,
+            "comparison": 0.15,
+            "reasoning": 0.50,
+            "open_ended": 0.20
+        },
+        "prompt_indexes": {
+            "knowledge_extraction": 9,
+            "factual": 43,
+            "comparison": 44,
+            "reasoning": 45,
+            "open_ended": 46,
+            "comprehensive": 343
+        }
+    },
+    "processing": {
+        "chunk_size": 2000,
+        "chunk_overlap": 200,
+        "batch_size": 50,
+        "pool_size": 100,
+        "max_tasks": 1000
+    },
+    "quality_control": {
+        "check_times": 5,
+        "pass_score": 1,
+        "check_indexes": [40, 37, 38]
+    },
+    "output": {
+        "formats": ["json", "csv"],
+        "include_statistics": true,
+        "include_source_mapping": true
+    }
+}

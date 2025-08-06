@@ -1,0 +1,8 @@
+openai>=1.0.0
+volcenginesdkarkruntime
+pandas
+asyncio
+aiofiles
+numpy
+tqdm
+jsonlines
