@@ -4,6 +4,18 @@
 
 本项目基于原多模态问答生成系统修改而来，专门用于处理纯文本数据，生成高质量的问答对。主要用于半导体和显示技术领域的知识问答数据集构建。
 
+## 最新更新 - 增强质量检测系统
+
+### 质量检测全面升级
+系统已集成基于 `checkInfor/checkQuestion.py` 的双阶段验证思路，显著提升了QA数据质量评估能力：
+
+- **双阶段验证机制**：先让模型独立回答问题，再比较答案正确性
+- **智能质量评估**：多维度评估内容准确性、完整性、逻辑性
+- **批量处理能力**：支持并发处理，提供详细质量报告
+- **多格式输出**：生成详细结果、高质量数据、质量报告和CSV分析文件
+
+详细使用说明请参考 [增强质量检查文档](ENHANCED_QUALITY_CHECK.md)
+
 ## 主要修改内容
 
 ### 1. 核心模块修改
@@ -64,7 +76,7 @@
 1. **异步批量处理架构**
 2. **数据清洗和格式化**
 3. **QA对生成核心逻辑**
-4. **数据质量检查**（简化版）
+4. **数据质量检查**（已升级为增强版）
 5. **批量推理优化**
 
 ## 运行流程
@@ -160,14 +172,13 @@ python text_qa_generation.py \
 - ✅ 数据清洗和格式化
 - ✅ QA对生成
 - ✅ 问题类型比例控制
-- ✅ 基础质量检查
+- ✅ 增强质量检查系统
 
 ### 未实现/简化
 - ❌ 图片处理（已移除）
 - ❌ PDF解析（已移除）
 - ❌ 多模态输入（已移除）
 - ⚠️ 数据演化（WizardLM）- 暂时移除
-- ⚠️ 高级质量检查 - 简化版本
 - ⚠️ MPO数据标注 - 暂时移除
 
 ## 配置说明
@@ -190,6 +201,15 @@ python text_qa_generation.py \
             "comparison": 0.15,
             "reasoning": 0.50,
             "open_ended": 0.20
+        }
+    },
+    "quality_control": {
+        "enhanced_quality_check": {
+            "enabled": true,
+            "parallel_core": 10,
+            "activate_stream": false,
+            "quality_threshold": 0.7,
+            "verification_method": "dual_stage"
         }
     }
 }
@@ -233,12 +253,17 @@ bash run_pipeline.sh
 BATCH_SIZE=100 POOL_SIZE=200 bash run_pipeline.sh
 ```
 
+运行脚本会在质量检查阶段询问是否使用增强质量检查功能。
+
 ### 4. 查看结果
 
 生成的问答对将保存在 `data/output/` 目录：
 - `results_343.json` - 生成的问答对
 - `results_343_stats.json` - 统计信息
-- `results_343_filtered.csv` - 质量检查后的数据（如果运行了质量检查）
+- `results_343_filtered.csv` - 质量检查后的数据（标准版）
+- `results_343_detailed.json` - 详细质量检查结果（增强版）
+- `results_343_high_quality.json` - 高质量数据（增强版）
+- `results_343_quality_report.json` - 质量报告（增强版）
 
 ## 示例输出
 
@@ -250,6 +275,34 @@ BATCH_SIZE=100 POOL_SIZE=200 bash run_pipeline.sh
     "question_type": "factual",
     "context": "IGZO材料特性章节"
 }
+```
+
+## 质量检查使用说明
+
+### 增强版质量检查（推荐）
+
+```bash
+python text_qa_generation.py \
+    --file_path "data/output/results_343.json" \
+    --output_file "data/output" \
+    --check_task True \
+    --enhanced_quality True \
+    --quality_threshold 0.7 \
+    --ark_url "http://0.0.0.0:8080/v1" \
+    --api_key "your_api_key" \
+    --model "/path/to/your/model"
+```
+
+### 标准质量检查（兼容模式）
+
+```bash
+python text_qa_generation.py \
+    --file_path "data/output/results_343.json" \
+    --output_file "data/output" \
+    --check_task True \
+    --enhanced_quality False \
+    --check_indexes "(40, 37, 38)" \
+    --check_times 5
 ```
 
 ### 推理型问题示例
