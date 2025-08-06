@@ -1,6 +1,9 @@
 import argparse
 import os
-from volcenginesdkarkruntime import Ark, AsyncArk
+try:
+    from volcenginesdkarkruntime import Ark, AsyncArk
+except ImportError:
+    from volcenginesdkarkruntime_compat import Ark, AsyncArk
 from openai import OpenAI, AsyncOpenAI
 import os
 import re

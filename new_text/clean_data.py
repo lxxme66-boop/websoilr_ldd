@@ -61,6 +61,28 @@ def clean_process(input_file,output_file,copy_parsed_pdf=False,):
         json.dump(output_json, f, ensure_ascii=False, indent=4)
         print("The number of responses is {}".format(len(output_json)))
 
+async def main(input_file, output_dir, copy_parsed_pdf=False):
+    """
+    Main function for data cleaning that can be called by other modules
+    
+    Args:
+        input_file: Path to the input pickle file
+        output_dir: Output directory path
+        copy_parsed_pdf: Whether to copy parsed PDF files
+        
+    Returns:
+        Path to the cleaned output file
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    clean_process(input_file, output_dir, copy_parsed_pdf=copy_parsed_pdf)
+    
+    output_file = os.path.join(output_dir, "total_response.json")
+    print(f"Cleaned data saved to {output_file}")
+    
+    return output_file
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some integers.")
     parser.add_argument("--input_file", type=str, \
