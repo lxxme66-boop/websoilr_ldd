@@ -183,15 +183,42 @@ class IntegratedQAPipeline:
         
         output_dir = self.config['file_paths']['output']['retrieved_dir']
         
+        # 智能判断输入路径类型
+        actual_input_path = input_path
+        
+        # 如果输入路径是data/pdfs但不存在，检查data/texts
+        if input_path == "data/pdfs" and not os.path.exists(input_path):
+            if os.path.exists("data/texts"):
+                logger.info("PDF目录不存在，切换到文本目录: data/texts")
+                actual_input_path = "data/texts"
+            else:
+                # 创建pdfs目录
+                os.makedirs("data/pdfs", exist_ok=True)
+                logger.warning(f"创建PDF目录: {input_path}")
+        
+        # 如果路径包含pdf但目录为空，尝试texts目录
+        if "pdf" in input_path.lower():
+            pdf_files = []
+            if os.path.exists(input_path):
+                pdf_files = [f for f in os.listdir(input_path) if f.endswith('.pdf')]
+            
+            if not pdf_files and os.path.exists("data/texts"):
+                txt_files = [f for f in os.listdir("data/texts") if f.endswith('.txt')]
+                if txt_files:
+                    logger.info(f"PDF目录为空，发现文本文件在data/texts，切换处理")
+                    actual_input_path = "data/texts"
+        
         # 构建召回参数
         retrieval_args = {
             'index': self.config['data_retrieval']['retrieval_indices'].get(domain, 43),
             'parallel_batch_size': self.config['processing']['parallel_batch_size'],
-            'pdf_path': input_path,
+            'pdf_path': actual_input_path,
             'storage_folder': output_dir,
             'selected_task_number': self.config['processing']['selected_task_number'],
             'read_hist': False
         }
+        
+        logger.info(f"实际处理路径: {actual_input_path}")
         
         try:
             # 调用召回模块

@@ -42,6 +42,14 @@ except ImportError as e:
             print("Error: input_text_process not available")
             return None
 
+# Import the enhanced file processor
+try:
+    from enhanced_file_processor import EnhancedFileProcessor
+    ENHANCED_PROCESSOR_AVAILABLE = True
+except ImportError:
+    print("Warning: Enhanced file processor not available, using legacy mode")
+    ENHANCED_PROCESSOR_AVAILABLE = False
+
 async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_tasks=20, selected_task_number=500, storage_folder=None, read_hist=False):
     total_tasks = []
     if read_hist and os.path.exists(os.path.join(storage_folder, "total_response.json")):
@@ -56,54 +64,98 @@ async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_
     await asyncio.sleep(1)
     
     total_responses = []
-    for folder in folders:
-        file_path = os.path.join(txt_path, folder)
+    
+    # 使用增强文件处理器
+    if ENHANCED_PROCESSOR_AVAILABLE and ("pdf" in txt_path.lower() or "text" in txt_path.lower()):
+        print("使用增强文件处理器...")
+        processor = EnhancedFileProcessor()
         
-        # Skip if not a txt file
-        if not folder.endswith('.txt'):
-            continue
-            
-        # Skip if already processed
-        if folder in processed_files:
-            print(f"File {folder} already processed, skipping.")
-            continue
-            
-        if not os.path.isfile(file_path):
-            continue
-            
-        try:
-            # Process txt file
-            tasks = await parse_txt(file_path, index=index)
-        except Exception as e:
-            print(f"Error processing {file_path}: {e}")
-            continue
-            
-        if len(tasks) == 0:
-            print(f"No tasks found in {file_path}, skipping this file.")
-            continue
-            
-        total_tasks.extend(tasks)
+        # 处理目录
+        pdf_results, txt_results = await processor.process_directory(txt_path)
         
-        if len(total_tasks) >= maximum_tasks:
-            print(f"Total tasks {len(total_tasks)} exceeds the maximum_tasks {maximum_tasks}, waiting for tasks to complete.")
-            batch_responses = await asyncio.gather(*total_tasks)
-            # Filter out None responses
-            batch_responses = [response for response in batch_responses if response is not None]
-            total_responses.extend(batch_responses)
-            total_tasks = []  # reset the tasks list
+        # 准备召回数据
+        retrieval_data = processor.prepare_for_retrieval(pdf_results, txt_results)
+        
+        print(f"处理完成: {len(pdf_results)} 个PDF文件, {len(txt_results)} 个文本文件")
+        
+        # 转换为任务格式
+        for data in retrieval_data:
+            if data['source_file'] not in processed_files:
+                # 创建任务
+                try:
+                    task = await input_text_process(data['content'])
+                except Exception as e:
+                    print(f"处理任务失败: {e}")
+                    task = None
+                    
+                if task:
+                    total_tasks.append(task)
+                    
+                    if len(total_tasks) >= maximum_tasks:
+                        print(f"Total tasks {len(total_tasks)} exceeds the maximum_tasks {maximum_tasks}, processing batch...")
+                        batch_responses = await asyncio.gather(*total_tasks)
+                        # Filter out None responses and add metadata
+                        for i, response in enumerate(batch_responses):
+                            if response is not None:
+                                response['source_file'] = retrieval_data[i]['source_file']
+                                response['file_type'] = retrieval_data[i]['file_type']
+                                total_responses.append(response)
+                        
+                        total_tasks = []  # reset the tasks list
+                        
+                        # Save batch
+                        os.makedirs(os.path.join(storage_folder, temporary_folder), exist_ok=True)
+                        batch_num = len(total_responses) // maximum_tasks + 1
+                        with open(os.path.join(storage_folder, temporary_folder, f"batch_{batch_num}.json"), "w",
+                            encoding="utf-8") as f:
+                            json.dump(batch_responses, f, ensure_ascii=False, indent=4)
+                            print(f"Batch {batch_num} responses saved")
+        
+    else:
+        # 原有的处理逻辑（仅处理txt文件）
+        for folder in folders:
+            file_path = os.path.join(txt_path, folder)
             
-            os.makedirs(os.path.join(storage_folder, temporary_folder), exist_ok=True)
-            with open(os.path.join(storage_folder, temporary_folder, f"batch_{len(total_responses)//maximum_tasks + 1}.json"), "w",
-                encoding="utf-8") as f:
-                json.dump(batch_responses, f, ensure_ascii=False, indent=4)
-                print(f"Batch {len(total_responses)//maximum_tasks + 1} responses saved to {storage_folder}/{temporary_folder}/batch_{len(total_responses)//maximum_tasks + 1}.json")
+            # Skip if not a txt file
+            if not folder.endswith('.txt'):
+                continue
                 
-        # Check if we have enough responses
-        if len(total_responses) >= selected_task_number:
-            print(f"Total responses {len(total_responses)} exceeds the selected_task_number {selected_task_number}, stopping the process.")
-            break
+            # Skip if already processed
+            if folder in processed_files:
+                print(f"File {folder} already processed, skipping.")
+                continue
+                
+            if not os.path.isfile(file_path):
+                continue
+                
+            try:
+                # Process txt file
+                tasks = await parse_txt(file_path, index=index)
+            except Exception as e:
+                print(f"Error processing {file_path}: {e}")
+                continue
+                
+            if len(tasks) == 0:
+                print(f"No tasks found in {file_path}, skipping this file.")
+                continue
+                
+            total_tasks.extend(tasks)
             
-    # Process remaining tasks
+            if len(total_tasks) >= maximum_tasks:
+                print(f"Total tasks {len(total_tasks)} exceeds the maximum_tasks {maximum_tasks}, waiting for tasks to complete.")
+                batch_responses = await asyncio.gather(*total_tasks)
+                # Filter out None responses
+                batch_responses = [response for response in batch_responses if response is not None]
+                total_responses.extend(batch_responses)
+                total_tasks = []  # reset the tasks list
+                
+                os.makedirs(os.path.join(storage_folder, temporary_folder), exist_ok=True)
+                with open(os.path.join(storage_folder, temporary_folder, f"batch_{len(total_responses)//maximum_tasks + 1}.json"), "w",
+                    encoding="utf-8") as f:
+                    json.dump(batch_responses, f, ensure_ascii=False, indent=4)
+                    print(f"Batch {len(total_responses)//maximum_tasks + 1} responses saved to {storage_folder}/{temporary_folder}/batch_{len(total_responses)//maximum_tasks + 1}.json")
+                
+        # Process remaining tasks
     if total_tasks:
         batch_responses = await asyncio.gather(*total_tasks)
         batch_responses = [response for response in batch_responses if response is not None]
