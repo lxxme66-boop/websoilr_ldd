@@ -270,11 +270,16 @@ run_data_rewriting() {
     
     print_message $BLUE "运行数据改写 - 比例: $ratio, 模板: $template_type"
     
+    # 从配置文件读取API密钥
+    local api_key=$(python3 -c "import json; print(json.load(open('config.json'))['api']['api_key'])" 2>/dev/null || echo "ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b")
+    local api_url=$(python3 -c "import json; print(json.load(open('config.json'))['api']['ark_url'])" 2>/dev/null || echo "http://0.0.0.0:8080/v1")
+    
     python3 model_rewrite/data_generation.py \
         --data-path "$input_path" \
         --output-path "data/rewritten/enhanced_qa.json" \
-        --template-type "$template_type" \
-        --rewrite-ratio "$ratio" || {
+        --api-key "$api_key" \
+        --api-url "$api_url" \
+        --concurrency 3 || {
         print_message $RED "数据改写失败"
         return 1
     }

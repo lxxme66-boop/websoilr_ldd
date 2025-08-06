@@ -1,5 +1,13 @@
+import os
+import sys
 from typing import Dict, Any, Optional, List
-from ..TextGeneration.prompts_conf import get_prompt, get_system_prompt
+
+# Add parent directory to path for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+
+from TextGeneration.prompts_conf import get_prompt, get_system_prompt
 
 
 class PromptBuilder:

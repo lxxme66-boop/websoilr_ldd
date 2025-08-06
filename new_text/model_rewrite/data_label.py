@@ -1,9 +1,16 @@
 import asyncio
 import json
 import os
+import sys
 from typing import List, Dict, Any, Optional, Tuple
 import argparse
-from ..TextGeneration.prompts_conf import get_prompt
+
+# Add parent directory to path for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+
+from TextGeneration.prompts_conf import get_prompt
 
 
 class DataLabeler:
