@@ -105,9 +105,10 @@ async def input_text_process(text_content, source_file, chunk_index=0, total_chu
     # Check if we should use mock mode
     use_mock = os.environ.get('USE_MOCK_API', 'false').lower() == 'true'
     
+    # Early return with mock data if OpenAI is not available or mock mode is enabled
     if use_mock or not OPENAI_AVAILABLE:
         # Return mock data for testing
-        logger.warning("Using mock mode for text processing")
+        logger.warning("Using mock mode for text processing (OpenAI not available or mock mode enabled)")
         result = {
             "content": f"Mock QA for {source_file} chunk {chunk_index + 1}/{total_chunks}:\nQ: What is discussed in this text?\nA: The text discusses semiconductor technology and related concepts.",
             "source_file": source_file,
@@ -124,10 +125,30 @@ async def input_text_process(text_content, source_file, chunk_index=0, total_chu
         }
         return result
     
+    # Only create client if OpenAI is available and not in mock mode
     try:
+        # Check if the API endpoint is accessible
+        import httpx
+        try:
+            test_client = httpx.Client(timeout=5.0)
+            response = test_client.get(f"{ark_url}/models")
+            response.raise_for_status()
+        except Exception as e:
+            logger.error(f"API endpoint {ark_url} is not accessible: {e}")
+            # Return mock data if API is not accessible
+            return {
+                "content": f"API unavailable, returning mock data for {source_file}",
+                "source_file": source_file,
+                "chunk_index": chunk_index,
+                "total_chunks": total_chunks,
+                "text_content": text_content[:500] + "..." if len(text_content) > 500 else text_content
+            }
+        
         client = AsyncOpenAI(
             api_key=api_key,
-            base_url=ark_url
+            base_url=ark_url,
+            max_retries=2,  # Reduce max retries
+            timeout=30.0    # Set a reasonable timeout
         )
     except Exception as e:
         logger.error(f"Failed to create OpenAI client: {e}")
