@@ -303,6 +303,13 @@
     }
   },
   
+  "paths": {
+    "text_dir": "data/texts",
+    "pdf_dir": "data/pdfs",
+    "text_output_dir": "data/qa_results/texts",
+    "pdf_output_dir": "data/qa_results/pdfs"
+  },
+  
   "file_paths": {
     "input": {
       "base_dir": "data/input",
@@ -316,7 +323,9 @@
       "qa_dir": "data/qa_results",
       "quality_dir": "data/quality_checked",
       "final_dir": "data/final_output",
-      "rewritten_dir": "data/rewritten"
+      "rewritten_dir": "data/rewritten",
+      "text_output_dir": "data/qa_results/texts",
+      "pdf_output_dir": "data/qa_results/pdfs"
     },
     "temp": {
       "base_dir": "temp",
