@@ -24,7 +24,7 @@
 #### 核心处理文件
 - `txt_main_batch_inference.py`：替代原`doubao_main_batch_inference.py`
   - 修改：处理txt文件夹而非PDF文件夹
-  - 修改：使用metadata.json存储文件元信息
+  - 修改：metadata.json变为可选文件
   - 保留：异步批处理架构
 
 - `clean_data.py`：数据清洗
@@ -43,6 +43,7 @@
   - 新增：`extract_txt_files()`批量提取文本
   - 修改：`get_request()`去除图片参数
   - 修改：`parse_txt_folder()`替代`parse_pdf()`
+  - 修改：metadata.json为可选，不存在时使用空字典
 
 - `Doubao/prompts_conf.py`
   - 修改：所有prompt改为文本分析相关
@@ -70,18 +71,18 @@
 ```
 txt_files/
 ├── folder1/
-│   ├── metadata.json  # 文件夹元信息
+│   ├── metadata.json  # 可选：文件夹元信息
 │   ├── text1.txt
 │   ├── text2.txt
 │   └── ...
 ├── folder2/
-│   ├── metadata.json
-│   ├── text1.txt
+│   ├── text1.txt      # 可以没有metadata.json
 │   └── ...
 └── ...
 ```
 
-### metadata.json 示例
+### metadata.json 示例（可选）
+如果提供metadata.json，格式如下：
 ```json
 {
   "folder_info": "文档集描述",
@@ -92,11 +93,12 @@ txt_files/
   }
 }
 ```
+注意：metadata.json是完全可选的。如果不存在，系统会使用空元数据继续处理。
 
 ## 运行流程
 
 ### 1. 准备数据
-将文本文件按文件夹组织，每个文件夹包含一个`metadata.json`文件。
+将文本文件按文件夹组织。每个文件夹可以选择性地包含一个`metadata.json`文件。
 
 ### 2. 运行脚本
 ```bash
@@ -117,6 +119,7 @@ txt_files/
 
 1. **文本提取**（txt_main_batch_inference.py）
    - 读取各文件夹中的txt文件
+   - 可选读取metadata.json
    - 使用prompt 43提取文本内容
    - 输出：total_response.pkl
 
@@ -218,6 +221,7 @@ pandas
 2. **并发控制**：根据API限制调整并发数量
 3. **文本编码**：确保所有文本文件使用UTF-8编码
 4. **内存管理**：处理大量文件时注意内存使用
+5. **metadata.json**：可选文件，不是必需的
 
 ## 故障排查
 
@@ -225,3 +229,4 @@ pandas
 2. **API限流**：降低并发数或增加重试间隔
 3. **JSON解析错误**：检查prompt返回格式
 4. **质量检查失败**：调整检查标准或增加检查次数
+5. **metadata.json缺失**：这是正常的，系统会继续处理

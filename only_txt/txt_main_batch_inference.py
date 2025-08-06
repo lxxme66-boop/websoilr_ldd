@@ -22,21 +22,34 @@ async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_
     
     for folder in folders:
         folder_path = os.path.join(txt_path, folder)
-        if not os.path.exists(os.path.join(folder_path, "metadata.json")):
-            print(f"metadata.json not found in {folder_path}, skipping this folder.")
-            continue
-        metadata = json.load(open(os.path.join(folder_path, "metadata.json"), "r"))
         
+        # Skip if not a directory
         if not os.path.isdir(folder_path):
             continue
+            
+        # Check if folder contains any txt files
+        txt_files = [f for f in os.listdir(folder_path) if f.endswith('.txt')]
+        if not txt_files:
+            print(f"No txt files found in {folder_path}, skipping this folder.")
+            continue
+            
+        # metadata.json is optional
+        metadata_path = os.path.join(folder_path, "metadata.json")
+        if os.path.exists(metadata_path):
+            print(f"Found metadata.json in {folder_path}")
+        else:
+            print(f"No metadata.json in {folder_path}, proceeding without metadata")
+        
         try:
             tasks = await parse_txt_folder(folder_path, index=index, processed_files=processed_files)
         except Exception as e:
-            raise e
+            print(f"Error processing {folder_path}: {e}")
             continue
+            
         if len(tasks) == 0:
             print(f"No tasks found in {folder_path}, skipping this folder.")
             continue
+            
         total_tasks.extend(tasks)
         if len(total_tasks) >= maximum_tasks:
             print(f"Total tasks {len(total_tasks)} exceeds the maximum_tasks {maximum_tasks}, waiting for tasks to complete.")

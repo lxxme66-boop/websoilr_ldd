@@ -46,11 +46,16 @@ def extract_txt_files(folder_path, processed_files=None):
     txt_files = []
     metadata_file = os.path.join(folder_path, "metadata.json")
     
-    # Read metadata if exists
+    # Read metadata if exists (optional)
     metadata = {}
     if os.path.exists(metadata_file):
-        with open(metadata_file, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
+        try:
+            with open(metadata_file, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+            logger.info(f"Loaded metadata from {metadata_file}")
+        except Exception as e:
+            logger.warning(f"Failed to load metadata from {metadata_file}: {e}")
+            metadata = {}
     
     # Get all txt files in the folder
     for file in os.listdir(folder_path):
@@ -124,6 +129,11 @@ async def parse_txt_folder(folder_path, index=5, processed_files=None):
     Parse all txt files in a folder
     """
     inputs = extract_txt_files(folder_path, processed_files)
+    
+    if not inputs:
+        logger.warning(f"No txt files found in {folder_path}")
+        return []
+    
     ark = AsyncOpenAI(api_key=api_key, base_url=ark_url)
     user_prompt = user_prompts[index]
     
@@ -137,7 +147,7 @@ async def parse_txt_folder(folder_path, index=5, processed_files=None):
         input_prompt = user_prompt.format(
             text_content=text_content,
             file_path=file_path,
-            metadata=json.dumps(metadata, ensure_ascii=False)
+            metadata=json.dumps(metadata, ensure_ascii=False) if metadata else "{}"
         )
         
         if not os.path.exists(file_path):
