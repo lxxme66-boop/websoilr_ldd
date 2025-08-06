@@ -240,7 +240,9 @@ class IntegratedQAPipeline:
                 'stage': 'text_retrieval'
             }
         except Exception as e:
+            import traceback
             logger.error(f"文本召回失败: {e}")
+            logger.error(f"详细错误信息: {traceback.format_exc()}")
             raise
     
     async def stage_data_cleaning(self, input_file: str) -> Dict:
