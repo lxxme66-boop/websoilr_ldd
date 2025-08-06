@@ -42,6 +42,17 @@ except ImportError as e:
             print("Error: input_text_process not available")
             return None
 
+# Try to import PDF processing capabilities
+PDF_SUPPORT = False
+try:
+    from MultiModal.pdf_processor import PDFProcessor
+    from Doubao.Datageneration import parse_pdf
+    PDF_SUPPORT = True
+    print("PDF processing support available")
+except ImportError:
+    print("Warning: PDF processing not available")
+
+
 async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_tasks=20, selected_task_number=500, storage_folder=None, read_hist=False):
     total_tasks = []
     if read_hist and os.path.exists(os.path.join(storage_folder, "total_response.json")):
@@ -59,8 +70,8 @@ async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_
     for folder in folders:
         file_path = os.path.join(txt_path, folder)
         
-        # Skip if not a txt file
-        if not folder.endswith('.txt'):
+        # Skip if not a txt or pdf file
+        if not (folder.endswith('.txt') or folder.endswith('.pdf')):
             continue
             
         # Skip if already processed
@@ -72,8 +83,14 @@ async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_
             continue
             
         try:
-            # Process txt file
-            tasks = await parse_txt(file_path, index=index)
+            # Process file based on type
+            if folder.endswith('.txt'):
+                tasks = await parse_txt(file_path, index=index)
+            elif folder.endswith('.pdf') and PDF_SUPPORT:
+                tasks = await parse_pdf(file_path, inddex=index)
+            else:
+                print(f"Unsupported file type or PDF support not available: {file_path}")
+                continue
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
             continue
@@ -135,9 +152,21 @@ async def main(index=43, parallel_batch_size=100, pdf_path=None, storage_folder=
     # Create output directory
     os.makedirs(storage_folder, exist_ok=True)
     
-    # Get all txt files
+    # Get all supported files (txt and pdf)
     if os.path.isdir(pdf_path):
-        files = [f for f in os.listdir(pdf_path) if f.endswith('.txt')]
+        # Get all txt and pdf files in the directory
+        all_files = os.listdir(pdf_path)
+        txt_files = [f for f in all_files if f.endswith('.txt')]
+        pdf_files = [f for f in all_files if f.endswith('.pdf')]
+        
+        # Combine both file types
+        files = txt_files + pdf_files
+        
+        if not files:
+            print(f"No txt or pdf files found in {pdf_path}")
+            return []
+        
+        print(f"Found {len(txt_files)} txt files and {len(pdf_files)} pdf files in {pdf_path}")
     else:
         # Single file processing
         files = [os.path.basename(pdf_path)]
