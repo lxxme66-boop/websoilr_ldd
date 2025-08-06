@@ -1,12 +1,25 @@
 import argparse
 import os
-from volcenginesdkarkruntime import Ark, AsyncArk
-from openai import OpenAI, AsyncOpenAI
-import os
 import re
-from .prompts_conf import system_prompt, user_prompts
 import asyncio
 import json
+
+# Optional imports with fallbacks
+try:
+    from volcenginesdkarkruntime import Ark, AsyncArk
+    VOLC_AVAILABLE = True
+except ImportError:
+    VOLC_AVAILABLE = False
+    print("Warning: volcenginesdkarkruntime not available")
+
+try:
+    from openai import OpenAI, AsyncOpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    print("Warning: openai not available")
+
+from .prompts_conf import system_prompt, user_prompts
 
 # API configuration
 ark_url = "http://0.0.0.0:8080/v1"

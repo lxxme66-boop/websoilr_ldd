@@ -1,4 +1,3 @@
-from TextGeneration.Datageneration import *
 import asyncio
 import time
 import pickle as pkl
@@ -6,6 +5,20 @@ import argparse
 import json
 import random
 import os
+
+# Import only what we need from Datageneration
+try:
+    from TextGeneration.Datageneration import process_folder_async, process_folder_async_with_history
+except ImportError as e:
+    print(f"Warning: Could not import from TextGeneration.Datageneration: {e}")
+    # Define dummy functions if imports fail
+    async def process_folder_async(*args, **kwargs):
+        print("Error: process_folder_async not available")
+        return []
+    
+    async def process_folder_async_with_history(*args, **kwargs):
+        print("Error: process_folder_async_with_history not available")
+        return []
 
 async def process_folders(folders, txt_path, temporary_folder, index=9, maximum_tasks=20, selected_task_number=500, storage_folder=None, read_hist=False):
     total_tasks = []
