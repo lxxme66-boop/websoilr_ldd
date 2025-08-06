@@ -179,7 +179,16 @@ class EnhancedFileProcessor:
             for pdf_file in pdf_files:
                 result = await self.process_file(pdf_file)
                 pdf_results.append(result)
+            
+            # 同时检查文本目录
+            if os.path.exists(self.txt_dir):
+                txt_files = self.get_files_by_type(self.txt_dir, 'text')
+                logger.info(f"在 {self.txt_dir} 找到 {len(txt_files)} 个文本文件")
                 
+                for txt_file in txt_files:
+                    result = await self.process_file(txt_file)
+                    txt_results.append(result)
+                    
         elif "text" in input_path.lower() or input_path == self.txt_dir:
             # 处理文本目录
             txt_files = self.get_files_by_type(input_path, 'text')
@@ -188,7 +197,16 @@ class EnhancedFileProcessor:
             for txt_file in txt_files:
                 result = await self.process_file(txt_file)
                 txt_results.append(result)
+            
+            # 同时检查PDF目录
+            if os.path.exists(self.pdf_dir):
+                pdf_files = self.get_files_by_type(self.pdf_dir, 'pdf')
+                logger.info(f"在 {self.pdf_dir} 找到 {len(pdf_files)} 个PDF文件")
                 
+                for pdf_file in pdf_files:
+                    result = await self.process_file(pdf_file)
+                    pdf_results.append(result)
+                    
         else:
             # 自动检测并处理两种类型
             logger.info(f"自动检测模式: {input_path}")
