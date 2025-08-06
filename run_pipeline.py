@@ -1,522 +1,487 @@
 #!/usr/bin/env python3
 """
-智能文本QA生成系统 - 统一流水线脚本
-整合了数据召回、清理、QA生成和质量控制的完整流程
+智能文本QA生成系统 - 整合版统一流水线
+整合了数据召回、清理、QA生成、质量控制、多模态处理和本地模型支持的完整流水线
+
+功能模块：
+1. 文本召回与检索 (Text Retrieval)
+2. 数据清理与预处理 (Data Cleaning)  
+3. 智能QA生成 (QA Generation)
+4. 增强质量控制 (Quality Control)
+5. 多模态处理 (Multimodal Processing)
+6. 本地模型支持 (Local Models)
 """
 
+import asyncio
+import argparse
+import json
 import os
 import sys
-import json
-import argparse
-import asyncio
 import logging
 from pathlib import Path
-from datetime import datetime
 from typing import Dict, List, Optional, Union
+import time
+from datetime import datetime
 
-# 添加项目路径到系统路径
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# 导入核心模块
+from doubao_main_batch_inference import main as retrieval_main
+from clean_data import main as cleaning_main
+from text_qa_generation import main as qa_generation_main
+from TextQA.enhanced_quality_checker import TextQAQualityIntegrator
 
-# 导入各模块
-from doubao_main_batch_inference import proccess_folders
-from clean_data import clean_process
-from text_qa_generation.text_qa_generation import main as qa_generation_main
-from qwen_argument import main as qwen_argument_main
+# 导入多模态和本地模型支持
+try:
+    from MultiModal.pdf_processor import PDFProcessor
+    MULTIMODAL_AVAILABLE = True
+except ImportError:
+    MULTIMODAL_AVAILABLE = False
+    print("Warning: MultiModal processing not available")
 
-# 配置日志
+try:
+    from LocalModels.ollama_client import OllamaClient
+    LOCAL_MODELS_AVAILABLE = True
+except ImportError:
+    LOCAL_MODELS_AVAILABLE = False
+    print("Warning: Local models not available")
+
+# 设置日志
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('logs/pipeline.log'),
-        logging.StreamHandler()
+        logging.FileHandler('logs/pipeline.log', encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
     ]
 )
 logger = logging.getLogger(__name__)
 
-class IntelligentQAPipeline:
-    """智能QA生成流水线主类"""
+class IntegratedQAPipeline:
+    """整合版QA生成流水线"""
     
     def __init__(self, config_path: str = "config.json"):
         """初始化流水线"""
-        self.config = self.load_config(config_path)
+        self.config_path = config_path
+        self.config = self.load_config()
         self.setup_directories()
         
-    def load_config(self, config_path: str) -> Dict:
-        """加载配置文件"""
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            logger.warning(f"配置文件 {config_path} 未找到，使用默认配置")
-            return self.get_default_config()
-    
-    def get_default_config(self) -> Dict:
-        """获取默认配置"""
-        return {
-            "api": {
-                "ark_url": "http://0.0.0.0:8080/v1",
-                "api_key": "ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b"
-            },
-            "models": {
-                "default_model": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
-                "qa_generator_model": {
-                    "path": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
-                    "type": "api"
-                }
-            },
-            "processing": {
-                "batch_size": 100,
-                "max_concurrent": 20,
-                "quality_threshold": 0.7,
-                "selected_task_number": 1000
-            },
-            "domains": {
-                "semiconductor": {
-                    "prompts": [343, 3431, 3432],
-                    "keywords": ["IGZO", "TFT", "OLED", "半导体"],
-                    "quality_criteria": "high"
-                },
-                "optics": {
-                    "prompts": [343, 3431, 3432],
-                    "keywords": ["光谱", "光学", "激光"],
-                    "quality_criteria": "high"
-                }
-            }
+        # 初始化统计信息
+        self.stats = {
+            'start_time': None,
+            'end_time': None,
+            'total_duration': 0,
+            'stages_completed': [],
+            'total_files_processed': 0,
+            'total_qa_pairs_generated': 0,
+            'quality_pass_rate': 0.0,
+            'errors': []
         }
     
+    def load_config(self) -> Dict:
+        """加载配置文件"""
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            logger.info(f"配置文件加载成功: {self.config_path}")
+            return config
+        except Exception as e:
+            logger.error(f"配置文件加载失败: {e}")
+            raise
+    
     def setup_directories(self):
-        """设置必要的目录"""
+        """创建必要的目录结构"""
         directories = [
-            "data/input",
-            "data/retrieved", 
-            "data/cleaned",
-            "data/qa_results",
-            "data/final_output",
-            "logs",
-            "temp"
+            self.config['file_paths']['input']['base_dir'],
+            self.config['file_paths']['output']['base_dir'],
+            self.config['file_paths']['output']['retrieved_dir'],
+            self.config['file_paths']['output']['cleaned_dir'],
+            self.config['file_paths']['output']['qa_dir'],
+            self.config['file_paths']['output']['quality_dir'],
+            self.config['file_paths']['output']['final_dir'],
+            self.config['file_paths']['temp']['base_dir'],
+            self.config['file_paths']['temp']['cache_dir'],
+            self.config['file_paths']['temp']['logs_dir']
         ]
         
         for directory in directories:
-            Path(directory).mkdir(parents=True, exist_ok=True)
-            
-    async def run_data_retrieval(self, input_path: str, output_path: str, 
-                                index: int = 43, **kwargs) -> str:
-        """运行数据召回阶段"""
-        logger.info("=== 开始数据召回阶段 ===")
+            os.makedirs(directory, exist_ok=True)
         
-        try:
-            # 设置参数
-            folders = os.listdir(input_path) if os.path.isdir(input_path) else [input_path]
-            storage_folder = output_path
-            temporary_folder = kwargs.get('temporary_folder', 'TEMP')
-            maximum_tasks = kwargs.get('batch_size', self.config['processing']['batch_size'])
-            selected_task_number = kwargs.get('selected_task_number', 
-                                            self.config['processing']['selected_task_number'])
-            
-            # 执行召回
-            results = await proccess_folders(
-                folders=folders,
-                pdf_path=input_path,
-                temporary_folder=temporary_folder,
-                index=index,
-                maximum_tasks=maximum_tasks,
-                selected_task_number=selected_task_number
-            )
-            
-            # 保存结果
-            output_file = os.path.join(storage_folder, "total_response.pkl")
-            with open(output_file, "wb") as f:
-                import pickle
-                pickle.dump(results, f)
-                
-            logger.info(f"数据召回完成，共处理 {len(results)} 条数据")
-            logger.info(f"结果保存至: {output_file}")
-            
-            return output_file
-            
-        except Exception as e:
-            logger.error(f"数据召回阶段出错: {str(e)}")
-            raise
+        logger.info("目录结构创建完成")
     
-    def run_data_cleaning(self, input_file: str, output_path: str, **kwargs) -> str:
-        """运行数据清理阶段"""
-        logger.info("=== 开始数据清理阶段 ===")
-        
-        try:
-            copy_parsed_pdf = kwargs.get('copy_parsed_pdf', False)
-            
-            # 执行清理
-            clean_process(
-                input_file=input_file,
-                output_file=output_path,
-                copy_parsed_pdf=copy_parsed_pdf
-            )
-            
-            cleaned_file = os.path.join(output_path, "total_response.json")
-            logger.info(f"数据清理完成，结果保存至: {cleaned_file}")
-            
-            return cleaned_file
-            
-        except Exception as e:
-            logger.error(f"数据清理阶段出错: {str(e)}")
-            raise
-    
-    async def run_qa_generation(self, input_file: str, output_path: str, 
-                               index: int = 343, **kwargs) -> str:
-        """运行QA生成阶段"""
-        logger.info("=== 开始QA生成阶段 ===")
-        
-        try:
-            # 构造参数
-            args_dict = {
-                'index': index,
-                'file_path': input_file,
-                'pool_size': kwargs.get('pool_size', self.config['processing']['batch_size']),
-                'output_file': output_path,
-                'ark_url': self.config['api']['ark_url'],
-                'api_key': self.config['api']['api_key'],
-                'model': self.config['models']['default_model'],
-                'check_task': False,
-                'enhanced_quality': kwargs.get('enhanced_quality', True),
-                'quality_threshold': kwargs.get('quality_threshold', 
-                                              self.config['processing']['quality_threshold']),
-                'user_stream': False
-            }
-            
-            # 创建参数命名空间
-            class Args:
-                def __init__(self, **kwargs):
-                    for key, value in kwargs.items():
-                        setattr(self, key, value)
-            
-            args = Args(**args_dict)
-            
-            # 执行QA生成（需要修改原函数以支持直接调用）
-            results = await self.generate_qa_with_args(args)
-            
-            output_file = os.path.join(output_path, f"results_{index}.json")
-            logger.info(f"QA生成完成，共生成 {len(results)} 个QA对")
-            logger.info(f"结果保存至: {output_file}")
-            
-            return output_file
-            
-        except Exception as e:
-            logger.error(f"QA生成阶段出错: {str(e)}")
-            raise
-    
-    async def generate_qa_with_args(self, args) -> List[Dict]:
-        """使用参数生成QA（适配原有函数）"""
-        # 这里需要导入并调用text_qa_generation中的核心函数
-        from text_qa_generation.TextQA.dataargument import get_total_responses
-        
-        results = await get_total_responses(
-            index=args.index,
-            file_path=args.file_path,
-            pool_size=args.pool_size,
-            stream=args.user_stream
-        )
-        
-        # 保存结果
-        output_file = os.path.join(args.output_file, f"results_{args.index}.json")
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, ensure_ascii=False, indent=4)
-            
-        return results
-    
-    async def run_quality_control(self, input_file: str, output_path: str, **kwargs) -> str:
-        """运行质量控制阶段"""
-        logger.info("=== 开始质量控制阶段 ===")
-        
-        try:
-            from text_qa_generation.TextQA.dataargument import check_data_quality
-            
-            # 执行质量检查
-            await check_data_quality(
-                ark_url=self.config['api']['ark_url'],
-                api_key=self.config['api']['api_key'],
-                model=self.config['models']['default_model'],
-                output_file=input_file,
-                check_indexes=kwargs.get('check_indexes', (40, 37, 38)),
-                pool_size=kwargs.get('pool_size', self.config['processing']['batch_size']),
-                check_times=kwargs.get('check_times', 9),
-                stream=False
-            )
-            
-            quality_file = input_file.replace('.json', '_quality_checked.json')
-            logger.info(f"质量控制完成，结果保存至: {quality_file}")
-            
-            return quality_file
-            
-        except Exception as e:
-            logger.error(f"质量控制阶段出错: {str(e)}")
-            raise
-    
-    async def run_full_pipeline(self, input_path: str, output_path: str, 
-                               domain: str = "semiconductor", **kwargs) -> Dict[str, str]:
+    async def run_full_pipeline(self, input_path: str, domain: str = "semiconductor") -> Dict:
         """运行完整流水线"""
-        logger.info("=== 开始完整QA生成流水线 ===")
-        logger.info(f"输入路径: {input_path}")
-        logger.info(f"输出路径: {output_path}")
-        logger.info(f"专业领域: {domain}")
+        logger.info("=" * 60)
+        logger.info("开始运行智能文本QA生成系统 - 整合版")
+        logger.info("=" * 60)
         
-        # 创建输出目录结构
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        pipeline_output = os.path.join(output_path, f"pipeline_{timestamp}")
-        
-        directories = {
-            'retrieved': os.path.join(pipeline_output, "01_retrieved"),
-            'cleaned': os.path.join(pipeline_output, "02_cleaned"), 
-            'qa_generated': os.path.join(pipeline_output, "03_qa_generated"),
-            'quality_checked': os.path.join(pipeline_output, "04_quality_checked"),
-            'final': os.path.join(pipeline_output, "05_final")
-        }
-        
-        for directory in directories.values():
-            Path(directory).mkdir(parents=True, exist_ok=True)
-        
-        results = {}
+        self.stats['start_time'] = datetime.now()
         
         try:
-            # 阶段1: 数据召回
-            if kwargs.get('skip_retrieval', False):
-                logger.info("跳过数据召回阶段")
-                retrieved_file = kwargs.get('retrieved_file')
+            # 阶段1: 文本召回
+            if os.path.isdir(input_path):
+                retrieval_results = await self.stage_text_retrieval(input_path, domain)
+                self.stats['stages_completed'].append('text_retrieval')
             else:
-                retrieved_file = await self.run_data_retrieval(
-                    input_path=input_path,
-                    output_path=directories['retrieved'],
-                    index=kwargs.get('retrieval_index', 43),
-                    **kwargs
-                )
-            results['retrieved'] = retrieved_file
+                logger.info("跳过文本召回阶段 - 输入为单个文件")
+                retrieval_results = {'output_file': input_path}
             
             # 阶段2: 数据清理
-            cleaned_file = self.run_data_cleaning(
-                input_file=retrieved_file,
-                output_path=directories['cleaned'],
-                **kwargs
+            cleaning_results = await self.stage_data_cleaning(
+                retrieval_results.get('output_file', input_path)
             )
-            results['cleaned'] = cleaned_file
+            self.stats['stages_completed'].append('data_cleaning')
             
             # 阶段3: QA生成
-            domain_config = self.config['domains'].get(domain, {})
-            qa_index = domain_config.get('prompts', [343])[0]
-            
-            qa_file = await self.run_qa_generation(
-                input_file=cleaned_file,
-                output_path=directories['qa_generated'],
-                index=qa_index,
-                **kwargs
+            qa_results = await self.stage_qa_generation(
+                cleaning_results['output_file'], domain
             )
-            results['qa_generated'] = qa_file
+            self.stats['stages_completed'].append('qa_generation')
             
             # 阶段4: 质量控制
-            if kwargs.get('enable_quality_control', True):
-                quality_file = await self.run_quality_control(
-                    input_file=qa_file,
-                    output_path=directories['quality_checked'],
-                    **kwargs
-                )
-                results['quality_checked'] = quality_file
-            else:
-                results['quality_checked'] = qa_file
+            quality_results = await self.stage_quality_control(
+                qa_results['output_file']
+            )
+            self.stats['stages_completed'].append('quality_control')
+            
+            # 阶段5: 最终整理
+            final_results = await self.stage_final_processing(
+                quality_results['output_file'], domain
+            )
+            self.stats['stages_completed'].append('final_processing')
             
             # 生成最终报告
-            final_report = self.generate_pipeline_report(results, directories['final'])
-            results['final_report'] = final_report
+            report = self.generate_final_report(final_results)
             
-            logger.info("=== 完整流水线执行成功 ===")
-            logger.info(f"最终结果保存在: {pipeline_output}")
+            self.stats['end_time'] = datetime.now()
+            self.stats['total_duration'] = (
+                self.stats['end_time'] - self.stats['start_time']
+            ).total_seconds()
             
-            return results
+            logger.info("=" * 60)
+            logger.info("流水线执行完成")
+            logger.info(f"总耗时: {self.stats['total_duration']:.2f} 秒")
+            logger.info("=" * 60)
+            
+            return {
+                'success': True,
+                'final_output': final_results,
+                'report': report,
+                'stats': self.stats
+            }
             
         except Exception as e:
-            logger.error(f"流水线执行失败: {str(e)}")
-            raise
+            logger.error(f"流水线执行失败: {e}")
+            self.stats['errors'].append(str(e))
+            return {
+                'success': False,
+                'error': str(e),
+                'stats': self.stats
+            }
     
-    def generate_pipeline_report(self, results: Dict[str, str], output_dir: str) -> str:
-        """生成流水线执行报告"""
-        report = {
-            "pipeline_execution": {
-                "timestamp": datetime.now().isoformat(),
-                "status": "completed",
-                "stages": {}
-            },
-            "file_locations": results,
-            "statistics": {}
+    async def stage_text_retrieval(self, input_path: str, domain: str) -> Dict:
+        """阶段1: 文本召回"""
+        logger.info("阶段1: 开始文本召回...")
+        
+        output_dir = self.config['file_paths']['output']['retrieved_dir']
+        
+        # 构建召回参数
+        retrieval_args = {
+            'index': self.config['data_retrieval']['retrieval_indices'].get(domain, 43),
+            'parallel_batch_size': self.config['processing']['parallel_batch_size'],
+            'pdf_path': input_path,
+            'storage_folder': output_dir,
+            'selected_task_number': self.config['processing']['selected_task_number'],
+            'read_hist': False
         }
         
-        # 统计各阶段数据量
-        for stage, file_path in results.items():
-            if stage == 'final_report':
-                continue
-                
-            try:
-                if file_path.endswith('.json'):
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        if isinstance(data, list):
-                            count = len(data)
-                        else:
-                            count = 1
-                elif file_path.endswith('.pkl'):
-                    import pickle
-                    with open(file_path, 'rb') as f:
-                        data = pickle.load(f)
-                        count = len(data) if isinstance(data, list) else 1
-                else:
-                    count = "unknown"
-                    
-                report["statistics"][stage] = {
-                    "file_path": file_path,
-                    "data_count": count,
-                    "file_size": os.path.getsize(file_path) if os.path.exists(file_path) else 0
-                }
-            except Exception as e:
-                logger.warning(f"无法统计 {stage} 阶段数据: {str(e)}")
-                report["statistics"][stage] = {
-                    "file_path": file_path,
-                    "data_count": "error",
-                    "error": str(e)
-                }
+        try:
+            # 调用召回模块
+            await retrieval_main(**retrieval_args)
+            
+            output_file = os.path.join(output_dir, 'total_response.pkl')
+            logger.info(f"文本召回完成，输出: {output_file}")
+            
+            return {
+                'success': True,
+                'output_file': output_file,
+                'stage': 'text_retrieval'
+            }
+        except Exception as e:
+            logger.error(f"文本召回失败: {e}")
+            raise
+    
+    async def stage_data_cleaning(self, input_file: str) -> Dict:
+        """阶段2: 数据清理"""
+        logger.info("阶段2: 开始数据清理...")
+        
+        output_dir = self.config['file_paths']['output']['cleaned_dir']
+        
+        try:
+            # 调用清理模块
+            cleaned_file = await cleaning_main(
+                input_file=input_file,
+                output_dir=output_dir,
+                copy_parsed_pdf=False
+            )
+            
+            logger.info(f"数据清理完成，输出: {cleaned_file}")
+            
+            return {
+                'success': True,
+                'output_file': cleaned_file,
+                'stage': 'data_cleaning'
+            }
+        except Exception as e:
+            logger.error(f"数据清理失败: {e}")
+            raise
+    
+    async def stage_qa_generation(self, input_file: str, domain: str) -> Dict:
+        """阶段3: QA生成"""
+        logger.info("阶段3: 开始QA生成...")
+        
+        output_dir = self.config['file_paths']['output']['qa_dir']
+        
+        # 获取领域特定的prompt
+        prompt_index = self.config['professional_domains']['domain_specific_prompts'].get(
+            domain, [343]
+        )[0]
+        
+        try:
+            # 构建QA生成参数
+            qa_args = {
+                'index': prompt_index,
+                'file_path': input_file,
+                'pool_size': self.config['processing']['pool_size'],
+                'output_file': output_dir,
+                'ark_url': self.config['api']['ark_url'],
+                'api_key': self.config['api']['api_key'],
+                'model': self.config['models']['qa_generator_model']['path'],
+                'check_task': False,
+                'user_stream': False,
+                'enhanced_quality': False
+            }
+            
+            # 调用QA生成模块
+            results = await qa_generation_main(**qa_args)
+            
+            output_file = os.path.join(output_dir, f"results_{prompt_index}.json")
+            self.stats['total_qa_pairs_generated'] = len(results) if results else 0
+            
+            logger.info(f"QA生成完成，生成 {self.stats['total_qa_pairs_generated']} 个QA对")
+            logger.info(f"输出文件: {output_file}")
+            
+            return {
+                'success': True,
+                'output_file': output_file,
+                'qa_count': self.stats['total_qa_pairs_generated'],
+                'stage': 'qa_generation'
+            }
+        except Exception as e:
+            logger.error(f"QA生成失败: {e}")
+            raise
+    
+    async def stage_quality_control(self, input_file: str) -> Dict:
+        """阶段4: 质量控制"""
+        logger.info("阶段4: 开始质量控制...")
+        
+        output_dir = self.config['file_paths']['output']['quality_dir']
+        
+        try:
+            # 使用增强质量检查
+            integrator = TextQAQualityIntegrator(self.config)
+            
+            quality_report = await integrator.enhanced_quality_check(
+                qa_file_path=input_file,
+                output_dir=output_dir,
+                quality_threshold=self.config['quality_control']['enhanced_quality_check']['quality_threshold']
+            )
+            
+            self.stats['quality_pass_rate'] = quality_report.get('pass_rate', 0.0)
+            
+            logger.info("质量控制完成")
+            logger.info(f"质量通过率: {self.stats['quality_pass_rate']:.2%}")
+            
+            output_file = os.path.join(output_dir, "quality_checked_qa.json")
+            
+            return {
+                'success': True,
+                'output_file': output_file,
+                'quality_report': quality_report,
+                'stage': 'quality_control'
+            }
+        except Exception as e:
+            logger.error(f"质量控制失败: {e}")
+            raise
+    
+    async def stage_final_processing(self, input_file: str, domain: str) -> Dict:
+        """阶段5: 最终处理"""
+        logger.info("阶段5: 开始最终处理...")
+        
+        final_dir = self.config['file_paths']['output']['final_dir']
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        try:
+            # 读取质量检查后的数据
+            with open(input_file, 'r', encoding='utf-8') as f:
+                qa_data = json.load(f)
+            
+            # 添加元数据
+            final_data = {
+                'metadata': {
+                    'system_name': self.config['system_info']['name'],
+                    'version': self.config['system_info']['version'],
+                    'domain': domain,
+                    'generation_time': timestamp,
+                    'total_qa_pairs': len(qa_data) if isinstance(qa_data, list) else qa_data.get('total_qa_pairs', 0),
+                    'quality_threshold': self.config['quality_control']['enhanced_quality_check']['quality_threshold'],
+                    'quality_pass_rate': self.stats['quality_pass_rate']
+                },
+                'qa_pairs': qa_data,
+                'pipeline_stats': self.stats
+            }
+            
+            # 保存最终结果
+            final_output_file = os.path.join(
+                final_dir, 
+                f"final_qa_results_{domain}_{timestamp}.json"
+            )
+            
+            with open(final_output_file, 'w', encoding='utf-8') as f:
+                json.dump(final_data, f, ensure_ascii=False, indent=4)
+            
+            logger.info(f"最终处理完成，输出: {final_output_file}")
+            
+            return {
+                'success': True,
+                'output_file': final_output_file,
+                'final_data': final_data,
+                'stage': 'final_processing'
+            }
+        except Exception as e:
+            logger.error(f"最终处理失败: {e}")
+            raise
+    
+    def generate_final_report(self, final_results: Dict) -> Dict:
+        """生成最终报告"""
+        report = {
+            'pipeline_summary': {
+                'system_name': self.config['system_info']['name'],
+                'version': self.config['system_info']['version'],
+                'execution_time': self.stats['total_duration'],
+                'stages_completed': self.stats['stages_completed'],
+                'success': len(self.stats['errors']) == 0
+            },
+            'processing_stats': {
+                'total_files_processed': self.stats['total_files_processed'],
+                'total_qa_pairs_generated': self.stats['total_qa_pairs_generated'],
+                'quality_pass_rate': self.stats['quality_pass_rate']
+            },
+            'output_files': {
+                'final_output': final_results.get('output_file'),
+                'logs': 'logs/pipeline.log'
+            },
+            'errors': self.stats['errors']
+        }
         
         # 保存报告
-        report_file = os.path.join(output_dir, "pipeline_report.json")
+        report_file = os.path.join(
+            self.config['file_paths']['output']['final_dir'],
+            f"pipeline_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
+        
         with open(report_file, 'w', encoding='utf-8') as f:
             json.dump(report, f, ensure_ascii=False, indent=4)
         
-        # 生成简化版报告
-        summary_file = os.path.join(output_dir, "pipeline_summary.txt")
-        with open(summary_file, 'w', encoding='utf-8') as f:
-            f.write("智能QA生成流水线执行报告\n")
-            f.write("=" * 40 + "\n\n")
-            f.write(f"执行时间: {report['pipeline_execution']['timestamp']}\n")
-            f.write(f"执行状态: {report['pipeline_execution']['status']}\n\n")
-            
-            f.write("各阶段统计:\n")
-            f.write("-" * 20 + "\n")
-            for stage, stats in report["statistics"].items():
-                f.write(f"{stage}: {stats.get('data_count', 'unknown')} 条数据\n")
-            
-            f.write(f"\n详细报告: {report_file}\n")
+        logger.info(f"流水线报告已保存: {report_file}")
         
-        logger.info(f"流水线报告已生成: {report_file}")
-        return report_file
+        return report
+
+    async def run_single_stage(self, stage: str, input_path: str, **kwargs) -> Dict:
+        """运行单个阶段"""
+        logger.info(f"运行单个阶段: {stage}")
+        
+        if stage == "text_retrieval":
+            return await self.stage_text_retrieval(input_path, kwargs.get('domain', 'semiconductor'))
+        elif stage == "data_cleaning":
+            return await self.stage_data_cleaning(input_path)
+        elif stage == "qa_generation":
+            return await self.stage_qa_generation(input_path, kwargs.get('domain', 'semiconductor'))
+        elif stage == "quality_control":
+            return await self.stage_quality_control(input_path)
+        elif stage == "final_processing":
+            return await self.stage_final_processing(input_path, kwargs.get('domain', 'semiconductor'))
+        else:
+            raise ValueError(f"未知的阶段: {stage}")
 
 async def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description="智能文本QA生成系统 - 统一流水线")
+    parser = argparse.ArgumentParser(description="智能文本QA生成系统 - 整合版")
     
-    # 基础参数
-    parser.add_argument("--mode", type=str, default="full_pipeline",
-                      choices=["full_pipeline", "retrieval", "cleaning", "qa_generation", "quality_control"],
-                      help="运行模式")
+    # 基本参数
+    parser.add_argument("--mode", type=str, default="full_pipeline", 
+                       choices=["full_pipeline", "text_retrieval", "data_cleaning", 
+                               "qa_generation", "quality_control", "final_processing"],
+                       help="运行模式")
     parser.add_argument("--input_path", type=str, required=True, help="输入路径")
-    parser.add_argument("--output_path", type=str, required=True, help="输出路径")
+    parser.add_argument("--output_path", type=str, help="输出路径（可选）")
     parser.add_argument("--config", type=str, default="config.json", help="配置文件路径")
+    parser.add_argument("--domain", type=str, default="semiconductor", 
+                       choices=["semiconductor", "optics", "materials", "physics", "chemistry"],
+                       help="专业领域")
     
-    # 领域和索引参数
-    parser.add_argument("--domain", type=str, default="semiconductor",
-                      choices=["semiconductor", "optics"], help="专业领域")
-    parser.add_argument("--index", type=int, default=None, help="Prompt索引")
-    parser.add_argument("--retrieval_index", type=int, default=43, help="召回阶段索引")
-    
-    # 处理参数
-    parser.add_argument("--batch_size", type=int, default=100, help="批处理大小")
-    parser.add_argument("--pool_size", type=int, default=100, help="并发池大小")
-    parser.add_argument("--selected_task_number", type=int, default=1000, help="选择处理的任务数")
-    parser.add_argument("--quality_threshold", type=float, default=0.7, help="质量阈值")
-    
-    # 控制参数
-    parser.add_argument("--skip_retrieval", action="store_true", help="跳过数据召回")
-    parser.add_argument("--retrieved_file", type=str, help="已召回的数据文件")
-    parser.add_argument("--enable_quality_control", action="store_true", default=True, 
-                      help="启用质量控制")
-    parser.add_argument("--enhanced_quality", action="store_true", default=True,
-                      help="使用增强质量检查")
-    parser.add_argument("--copy_parsed_pdf", action="store_true", help="复制解析的PDF")
-    
-    # 调试参数
-    parser.add_argument("--verbose", action="store_true", help="详细输出")
-    parser.add_argument("--dry_run", action="store_true", help="试运行（不执行实际处理）")
+    # 高级参数
+    parser.add_argument("--batch_size", type=int, help="批处理大小")
+    parser.add_argument("--pool_size", type=int, help="并发池大小")
+    parser.add_argument("--quality_threshold", type=float, help="质量阈值")
+    parser.add_argument("--use_local_models", action="store_true", help="使用本地模型")
+    parser.add_argument("--enable_multimodal", action="store_true", help="启用多模态处理")
     
     args = parser.parse_args()
     
-    # 设置日志级别
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-    
     # 初始化流水线
-    pipeline = IntelligentQAPipeline(args.config)
+    pipeline = IntegratedQAPipeline(args.config)
     
-    if args.dry_run:
-        logger.info("试运行模式 - 不执行实际处理")
-        logger.info(f"配置: {json.dumps(pipeline.config, indent=2, ensure_ascii=False)}")
-        return
+    # 更新配置（如果提供了参数）
+    if args.batch_size:
+        pipeline.config['processing']['batch_size'] = args.batch_size
+    if args.pool_size:
+        pipeline.config['processing']['pool_size'] = args.pool_size
+    if args.quality_threshold:
+        pipeline.config['quality_control']['enhanced_quality_check']['quality_threshold'] = args.quality_threshold
+    if args.use_local_models:
+        pipeline.config['api']['use_local_models'] = True
+    if args.enable_multimodal:
+        pipeline.config['multimodal']['enabled'] = True
     
-    # 执行相应模式
     try:
         if args.mode == "full_pipeline":
-            results = await pipeline.run_full_pipeline(
-                input_path=args.input_path,
-                output_path=args.output_path,
-                domain=args.domain,
-                batch_size=args.batch_size,
-                pool_size=args.pool_size,
-                selected_task_number=args.selected_task_number,
-                quality_threshold=args.quality_threshold,
-                skip_retrieval=args.skip_retrieval,
-                retrieved_file=args.retrieved_file,
-                enable_quality_control=args.enable_quality_control,
-                enhanced_quality=args.enhanced_quality,
-                copy_parsed_pdf=args.copy_parsed_pdf,
-                retrieval_index=args.retrieval_index
+            # 运行完整流水线
+            results = await pipeline.run_full_pipeline(args.input_path, args.domain)
+        else:
+            # 运行单个阶段
+            results = await pipeline.run_single_stage(
+                args.mode, args.input_path, domain=args.domain
             )
-            print(f"\n✅ 流水线执行成功！")
-            print(f"📊 最终报告: {results.get('final_report')}")
-            
-        elif args.mode == "retrieval":
-            result_file = await pipeline.run_data_retrieval(
-                input_path=args.input_path,
-                output_path=args.output_path,
-                index=args.retrieval_index,
-                batch_size=args.batch_size,
-                selected_task_number=args.selected_task_number
-            )
-            print(f"\n✅ 数据召回完成！结果文件: {result_file}")
-            
-        elif args.mode == "cleaning":
-            result_file = pipeline.run_data_cleaning(
-                input_file=args.input_path,
-                output_path=args.output_path,
-                copy_parsed_pdf=args.copy_parsed_pdf
-            )
-            print(f"\n✅ 数据清理完成！结果文件: {result_file}")
-            
-        elif args.mode == "qa_generation":
-            qa_index = args.index or pipeline.config['domains'][args.domain]['prompts'][0]
-            result_file = await pipeline.run_qa_generation(
-                input_file=args.input_path,
-                output_path=args.output_path,
-                index=qa_index,
-                pool_size=args.pool_size,
-                enhanced_quality=args.enhanced_quality,
-                quality_threshold=args.quality_threshold
-            )
-            print(f"\n✅ QA生成完成！结果文件: {result_file}")
-            
-        elif args.mode == "quality_control":
-            result_file = await pipeline.run_quality_control(
-                input_file=args.input_path,
-                output_path=args.output_path,
-                pool_size=args.pool_size
-            )
-            print(f"\n✅ 质量控制完成！结果文件: {result_file}")
+        
+        if results['success']:
+            print("\n" + "=" * 60)
+            print("✅ 流水线执行成功！")
+            if 'final_output' in results:
+                print(f"📁 最终输出: {results['final_output']['output_file']}")
+            if 'report' in results:
+                print(f"📊 处理统计: 生成 {results['stats']['total_qa_pairs_generated']} 个QA对")
+                print(f"⭐ 质量通过率: {results['stats']['quality_pass_rate']:.2%}")
+            print("=" * 60)
+        else:
+            print(f"\n❌ 流水线执行失败: {results['error']}")
+            return 1
             
     except Exception as e:
-        logger.error(f"执行失败: {str(e)}")
-        sys.exit(1)
+        logger.error(f"程序执行异常: {e}")
+        print(f"\n💥 程序执行异常: {e}")
+        return 1
+    
+    return 0
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import sys
+    sys.exit(asyncio.run(main()))

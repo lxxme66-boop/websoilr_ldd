@@ -1,12 +1,14 @@
-# 智能文本QA生成系统 - 依赖包列表
-# 基础依赖
+# 智能文本QA生成系统 - 整合版依赖包列表
+# 支持数据召回、文本处理、QA生成、质量控制、多模态处理、本地模型等完整功能
 
 # 核心依赖
-asyncio-mqtt>=0.13.0
+asyncio
 aiohttp>=3.8.0
 httpx>=0.24.0
 openai>=1.0.0
 volcenginesdkarkruntime>=1.0.0
+requests>=2.28.0
+python-dotenv>=0.19.0
 
 # 数据处理
 pandas>=1.5.0
@@ -14,25 +16,37 @@ numpy>=1.24.0
 json5>=0.9.0
 pydantic>=2.0.0
 
-# 文件处理
+# 多模态和文件处理
 PyMuPDF>=1.23.0  # PDF处理
 Pillow>=9.0.0    # 图像处理
+opencv-python>=4.6.0  # 图像处理（可选）
 python-docx>=0.8.11  # Word文档处理
 
 # 异步处理和并发
-asyncio>=3.4.3
 concurrent-futures>=3.1.1
 multiprocessing-logging>=0.3.4
 
-# 正则表达式和文本处理
+# 本地模型支持（可选）
+ollama>=0.1.0    # Ollama客户端
+transformers>=4.30.0  # HuggingFace Transformers
+torch>=2.0.0     # PyTorch
+torchvision>=0.13.0  # PyTorch Vision
+accelerate>=0.20.0  # 模型加速
+bitsandbytes>=0.39.0  # 量化支持
+
+# API客户端
+anthropic>=0.3.0  # Anthropic API（可选）
+
+# 文本处理和NLP
 regex>=2023.0.0
 nltk>=3.8.0
-jieba>=0.42.1  # 中文分词
+jieba>=0.42.1    # 中文分词
+scikit-learn>=1.1.0  # 机器学习工具
 
 # 日志和监控
 loguru>=0.7.0
-psutil>=5.9.0  # 系统监控
-tqdm>=4.65.0   # 进度条
+psutil>=5.9.0    # 系统监控
+tqdm>=4.65.0     # 进度条
 
 # 配置文件处理
 pyyaml>=6.0
@@ -43,17 +57,19 @@ configparser>=5.3.0
 jsonschema>=4.17.0
 marshmallow>=3.19.0
 
-# 可选依赖 - 本地模型支持
-# torch>=2.0.0
-# transformers>=4.30.0
-# ollama>=0.1.0
-# vllm>=0.2.0
+# CLI和用户界面
+click>=8.1.0     # 命令行工具
+typer>=0.6.0     # CLI工具
+rich>=13.0.0     # 终端美化
+
+# 实用工具
+pathlib2>=2.3.7  # 路径处理增强
+typing-extensions>=4.7.0
 
 # 可选依赖 - 数据科学和可视化
-# matplotlib>=3.7.0
-# seaborn>=0.12.0
-# plotly>=5.15.0
-# jupyter>=1.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.15.0
 
 # 可选依赖 - 高级文本处理
 # spacy>=3.6.0
@@ -67,11 +83,3 @@ pytest-cov>=4.1.0
 black>=23.0.0
 flake8>=6.0.0
 mypy>=1.4.0
-
-# 类型提示
-typing-extensions>=4.7.0
-
-# 实用工具
-click>=8.1.0  # 命令行工具
-rich>=13.0.0  # 终端美化
-pathlib2>=2.3.7  # 路径处理增强

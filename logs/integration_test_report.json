@@ -1,0 +1,367 @@
+{
+    "passed": 46,
+    "failed": 6,
+    "warnings": 8,
+    "details": [
+        {
+            "test": "文件存在检查",
+            "status": "PASS",
+            "message": "run_pipeline.py 存在",
+            "details": null
+        },
+        {
+            "test": "文件存在检查",
+            "status": "PASS",
+            "message": "config.json 存在",
+            "details": null
+        },
+        {
+            "test": "文件存在检查",
+            "status": "PASS",
+            "message": "requirements.txt 存在",
+            "details": null
+        },
+        {
+            "test": "文件存在检查",
+            "status": "PASS",
+            "message": "README.md 存在",
+            "details": null
+        },
+        {
+            "test": "文件存在检查",
+            "status": "PASS",
+            "message": "quick_start.sh 存在",
+            "details": null
+        },
+        {
+            "test": "目录存在检查",
+            "status": "PASS",
+            "message": "TextQA/ 存在",
+            "details": null
+        },
+        {
+            "test": "目录存在检查",
+            "status": "PASS",
+            "message": "TextGeneration/ 存在",
+            "details": null
+        },
+        {
+            "test": "目录存在检查",
+            "status": "PASS",
+            "message": "LocalModels/ 存在",
+            "details": null
+        },
+        {
+            "test": "目录存在检查",
+            "status": "PASS",
+            "message": "MultiModal/ 存在",
+            "details": null
+        },
+        {
+            "test": "配置文件解析",
+            "status": "PASS",
+            "message": "config.json 格式正确",
+            "details": null
+        },
+        {
+            "test": "配置节检查",
+            "status": "PASS",
+            "message": "配置节 system_info 存在",
+            "details": null
+        },
+        {
+            "test": "配置节检查",
+            "status": "PASS",
+            "message": "配置节 api 存在",
+            "details": null
+        },
+        {
+            "test": "配置节检查",
+            "status": "PASS",
+            "message": "配置节 models 存在",
+            "details": null
+        },
+        {
+            "test": "配置节检查",
+            "status": "PASS",
+            "message": "配置节 processing 存在",
+            "details": null
+        },
+        {
+            "test": "配置节检查",
+            "status": "PASS",
+            "message": "配置节 professional_domains 存在",
+            "details": null
+        },
+        {
+            "test": "版本信息",
+            "status": "PASS",
+            "message": "系统版本: 2.0.0",
+            "details": null
+        },
+        {
+            "test": "功能特性",
+            "status": "PASS",
+            "message": "集成功能: 7 个",
+            "details": null
+        },
+        {
+            "test": "模块导入",
+            "status": "FAIL",
+            "message": "TextQA数据处理 导入失败: No module named 'openai'",
+            "details": null
+        },
+        {
+            "test": "模块导入",
+            "status": "FAIL",
+            "message": "TextQA增强质量检查 导入失败: No module named 'pandas'",
+            "details": null
+        },
+        {
+            "test": "模块导入",
+            "status": "FAIL",
+            "message": "TextGeneration数据生成 导入失败: No module named 'volcenginesdkarkruntime'",
+            "details": null
+        },
+        {
+            "test": "模块导入",
+            "status": "PASS",
+            "message": "TextGeneration Prompt配置 导入成功",
+            "details": null
+        },
+        {
+            "test": "可选模块导入",
+            "status": "WARN",
+            "message": "本地模型支持 不可用（可能未安装依赖）",
+            "details": null
+        },
+        {
+            "test": "可选模块导入",
+            "status": "WARN",
+            "message": "多模态PDF处理 不可用（可能未安装依赖）",
+            "details": null
+        },
+        {
+            "test": "Prompt数量",
+            "status": "PASS",
+            "message": "可用Prompt: 28 个",
+            "details": null
+        },
+        {
+            "test": "关键Prompt",
+            "status": "PASS",
+            "message": "Prompt 343 存在",
+            "details": null
+        },
+        {
+            "test": "关键Prompt",
+            "status": "PASS",
+            "message": "Prompt 3431 存在",
+            "details": null
+        },
+        {
+            "test": "关键Prompt",
+            "status": "PASS",
+            "message": "Prompt 3432 存在",
+            "details": null
+        },
+        {
+            "test": "核心依赖",
+            "status": "PASS",
+            "message": "异步处理 (asyncio) 可用",
+            "details": null
+        },
+        {
+            "test": "核心依赖",
+            "status": "PASS",
+            "message": "JSON处理 (json) 可用",
+            "details": null
+        },
+        {
+            "test": "核心依赖",
+            "status": "FAIL",
+            "message": "数据处理 (pandas) 缺失",
+            "details": null
+        },
+        {
+            "test": "核心依赖",
+            "status": "FAIL",
+            "message": "数值计算 (numpy) 缺失",
+            "details": null
+        },
+        {
+            "test": "核心依赖",
+            "status": "FAIL",
+            "message": "HTTP客户端 (aiohttp) 缺失",
+            "details": null
+        },
+        {
+            "test": "可选依赖",
+            "status": "WARN",
+            "message": "PDF处理 (PyMuPDF) 不可用",
+            "details": null
+        },
+        {
+            "test": "可选依赖",
+            "status": "WARN",
+            "message": "图像处理 (Pillow) 不可用",
+            "details": null
+        },
+        {
+            "test": "可选依赖",
+            "status": "WARN",
+            "message": "计算机视觉 (OpenCV) 不可用",
+            "details": null
+        },
+        {
+            "test": "可选依赖",
+            "status": "WARN",
+            "message": "Transformers模型 不可用",
+            "details": null
+        },
+        {
+            "test": "可选依赖",
+            "status": "WARN",
+            "message": "PyTorch 不可用",
+            "details": null
+        },
+        {
+            "test": "流水线脚本",
+            "status": "PASS",
+            "message": "run_pipeline.py 语法正确",
+            "details": null
+        },
+        {
+            "test": "流水线类",
+            "status": "PASS",
+            "message": "IntegratedQAPipeline 类存在",
+            "details": null
+        },
+        {
+            "test": "流水线方法",
+            "status": "PASS",
+            "message": "方法 run_full_pipeline 存在",
+            "details": null
+        },
+        {
+            "test": "流水线方法",
+            "status": "PASS",
+            "message": "方法 stage_text_retrieval 存在",
+            "details": null
+        },
+        {
+            "test": "流水线方法",
+            "status": "PASS",
+            "message": "方法 stage_data_cleaning 存在",
+            "details": null
+        },
+        {
+            "test": "流水线方法",
+            "status": "PASS",
+            "message": "方法 stage_qa_generation 存在",
+            "details": null
+        },
+        {
+            "test": "流水线方法",
+            "status": "PASS",
+            "message": "方法 stage_quality_control 存在",
+            "details": null
+        },
+        {
+            "test": "启动脚本",
+            "status": "PASS",
+            "message": "quick_start.sh 可执行",
+            "details": null
+        },
+        {
+            "test": "启动脚本功能",
+            "status": "PASS",
+            "message": "功能 show_help 存在",
+            "details": null
+        },
+        {
+            "test": "启动脚本功能",
+            "status": "PASS",
+            "message": "功能 setup_environment 存在",
+            "details": null
+        },
+        {
+            "test": "启动脚本功能",
+            "status": "PASS",
+            "message": "功能 check_environment 存在",
+            "details": null
+        },
+        {
+            "test": "启动脚本功能",
+            "status": "PASS",
+            "message": "功能 run_full_pipeline 存在",
+            "details": null
+        },
+        {
+            "test": "目录创建",
+            "status": "PASS",
+            "message": "目录 data 存在/创建成功",
+            "details": null
+        },
+        {
+            "test": "目录创建",
+            "status": "PASS",
+            "message": "目录 data/input 存在/创建成功",
+            "details": null
+        },
+        {
+            "test": "目录创建",
+            "status": "PASS",
+            "message": "目录 data/output 存在/创建成功",
+            "details": null
+        },
+        {
+            "test": "目录创建",
+            "status": "PASS",
+            "message": "目录 logs 存在/创建成功",
+            "details": null
+        },
+        {
+            "test": "目录创建",
+            "status": "PASS",
+            "message": "目录 temp 存在/创建成功",
+            "details": null
+        },
+        {
+            "test": "功能配置",
+            "status": "PASS",
+            "message": "多模态处理 配置存在",
+            "details": null
+        },
+        {
+            "test": "功能配置",
+            "status": "WARN",
+            "message": "本地模型 配置缺失",
+            "details": null
+        },
+        {
+            "test": "功能配置",
+            "status": "PASS",
+            "message": "专业领域 配置存在",
+            "details": null
+        },
+        {
+            "test": "功能配置",
+            "status": "PASS",
+            "message": "质量控制 配置存在",
+            "details": null
+        },
+        {
+            "test": "功能配置",
+            "status": "PASS",
+            "message": "数据改写 配置存在",
+            "details": null
+        },
+        {
+            "test": "领域配置",
+            "status": "PASS",
+            "message": "半导体和光学领域配置完整",
+            "details": null
+        }
+    ]
+}
