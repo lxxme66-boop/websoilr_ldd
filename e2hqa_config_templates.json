@@ -1,0 +1,512 @@
+{
+  "config_templates": {
+    "default": {
+      "name": "默认配置",
+      "description": "适合大多数场景的均衡配置",
+      "gpt4_config": {
+        "api_key": "your-gpt4-api-key-here",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4",
+        "temperature": 0.7,
+        "max_tokens": 2000
+      },
+      "lrm_config": {
+        "api_key": "your-lrm-api-key-here", 
+        "base_url": "https://api.your-lrm-provider.com/v1",
+        "model": "qwq-plus",
+        "temperature": 0.8,
+        "max_tokens": 3000
+      },
+      "rejection_sampling_n": 5,
+      "quality_threshold": 0.7,
+      "qa_type_ratios": {
+        "simple_factual": 0.2,
+        "complex_reasoning": 0.3,
+        "multi_hop": 0.2,
+        "analytical": 0.15,
+        "open_ended": 0.15
+      },
+      "cot_type_ratios": {
+        "short_cot": 0.4,
+        "long_cot": 0.6
+      },
+      "trajectory_filter": {
+        "format_validation": true,
+        "answer_correctness": true,
+        "quality_assessment": true,
+        "redundancy_check": true,
+        "alignment_check": true,
+        "reasoning_coherence": true
+      }
+    },
+
+    "production": {
+      "name": "生产环境配置",
+      "description": "高质量要求的生产环境配置",
+      "gpt4_config": {
+        "api_key": "your-gpt4-api-key-here",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4",
+        "temperature": 0.6,
+        "max_tokens": 2500
+      },
+      "lrm_config": {
+        "api_key": "your-lrm-api-key-here",
+        "base_url": "https://api.your-lrm-provider.com/v1", 
+        "model": "qwq-plus",
+        "temperature": 0.7,
+        "max_tokens": 4000
+      },
+      "rejection_sampling_n": 8,
+      "quality_threshold": 0.8,
+      "qa_type_ratios": {
+        "simple_factual": 0.1,
+        "complex_reasoning": 0.4,
+        "multi_hop": 0.3,
+        "analytical": 0.15,
+        "open_ended": 0.05
+      },
+      "cot_type_ratios": {
+        "short_cot": 0.3,
+        "long_cot": 0.7
+      },
+      "trajectory_filter": {
+        "format_validation": true,
+        "answer_correctness": true,
+        "quality_assessment": true,
+        "redundancy_check": true,
+        "alignment_check": true,
+        "reasoning_coherence": true
+      }
+    },
+
+    "research_focused": {
+      "name": "研究导向配置",
+      "description": "重点关注开放性和创新性问题的配置",
+      "gpt4_config": {
+        "api_key": "your-gpt4-api-key-here",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4",
+        "temperature": 0.8,
+        "max_tokens": 2000
+      },
+      "lrm_config": {
+        "api_key": "your-lrm-api-key-here",
+        "base_url": "https://api.your-lrm-provider.com/v1",
+        "model": "qwq-plus", 
+        "temperature": 0.9,
+        "max_tokens": 5000
+      },
+      "rejection_sampling_n": 10,
+      "quality_threshold": 0.7,
+      "qa_type_ratios": {
+        "simple_factual": 0.05,
+        "complex_reasoning": 0.25,
+        "multi_hop": 0.2,
+        "analytical": 0.25,
+        "open_ended": 0.25
+      },
+      "cot_type_ratios": {
+        "short_cot": 0.2,
+        "long_cot": 0.8
+      },
+      "trajectory_filter": {
+        "format_validation": true,
+        "answer_correctness": true,
+        "quality_assessment": true,
+        "redundancy_check": true,
+        "alignment_check": true,
+        "reasoning_coherence": true
+      }
+    },
+
+    "education": {
+      "name": "教育培训配置",
+      "description": "适合教育场景的多层次难度配置",
+      "gpt4_config": {
+        "api_key": "your-gpt4-api-key-here",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4",
+        "temperature": 0.7,
+        "max_tokens": 1800
+      },
+      "lrm_config": {
+        "api_key": "your-lrm-api-key-here",
+        "base_url": "https://api.your-lrm-provider.com/v1",
+        "model": "qwq-plus",
+        "temperature": 0.7,
+        "max_tokens": 3500
+      },
+      "rejection_sampling_n": 6,
+      "quality_threshold": 0.75,
+      "qa_type_ratios": {
+        "simple_factual": 0.3,
+        "complex_reasoning": 0.25,
+        "multi_hop": 0.2,
+        "analytical": 0.15,
+        "open_ended": 0.1
+      },
+      "cot_type_ratios": {
+        "short_cot": 0.5,
+        "long_cot": 0.5
+      },
+      "trajectory_filter": {
+        "format_validation": true,
+        "answer_correctness": true,
+        "quality_assessment": true,
+        "redundancy_check": true,
+        "alignment_check": true,
+        "reasoning_coherence": true
+      }
+    },
+
+    "fast_generation": {
+      "name": "快速生成配置", 
+      "description": "优化速度的配置，适合大批量处理",
+      "gpt4_config": {
+        "api_key": "your-gpt4-api-key-here",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4",
+        "temperature": 0.7,
+        "max_tokens": 1500
+      },
+      "lrm_config": {
+        "api_key": "your-lrm-api-key-here",
+        "base_url": "https://api.your-lrm-provider.com/v1",
+        "model": "qwq-plus",
+        "temperature": 0.7,
+        "max_tokens": 2500
+      },
+      "rejection_sampling_n": 3,
+      "quality_threshold": 0.6,
+      "qa_type_ratios": {
+        "simple_factual": 0.25,
+        "complex_reasoning": 0.35,
+        "multi_hop": 0.2,
+        "analytical": 0.1,
+        "open_ended": 0.1
+      },
+      "cot_type_ratios": {
+        "short_cot": 0.6,
+        "long_cot": 0.4
+      },
+      "trajectory_filter": {
+        "format_validation": true,
+        "answer_correctness": true,
+        "quality_assessment": false,
+        "redundancy_check": true,
+        "alignment_check": true,
+        "reasoning_coherence": false
+      }
+    },
+
+    "high_quality": {
+      "name": "高质量配置",
+      "description": "追求最高质量输出的配置",
+      "gpt4_config": {
+        "api_key": "your-gpt4-api-key-here",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4",
+        "temperature": 0.5,
+        "max_tokens": 3000
+      },
+      "lrm_config": {
+        "api_key": "your-lrm-api-key-here",
+        "base_url": "https://api.your-lrm-provider.com/v1",
+        "model": "qwq-plus",
+        "temperature": 0.6,
+        "max_tokens": 6000
+      },
+      "rejection_sampling_n": 12,
+      "quality_threshold": 0.85,
+      "qa_type_ratios": {
+        "simple_factual": 0.05,
+        "complex_reasoning": 0.4,
+        "multi_hop": 0.3,
+        "analytical": 0.2,
+        "open_ended": 0.05
+      },
+      "cot_type_ratios": {
+        "short_cot": 0.2,
+        "long_cot": 0.8
+      },
+      "trajectory_filter": {
+        "format_validation": true,
+        "answer_correctness": true,
+        "quality_assessment": true,
+        "redundancy_check": true,
+        "alignment_check": true,
+        "reasoning_coherence": true
+      }
+    },
+
+    "creative_thinking": {
+      "name": "创新思维配置",
+      "description": "重点培养创新思维和开放性思考",
+      "gpt4_config": {
+        "api_key": "your-gpt4-api-key-here",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4",
+        "temperature": 0.9,
+        "max_tokens": 2200
+      },
+      "lrm_config": {
+        "api_key": "your-lrm-api-key-here",
+        "base_url": "https://api.your-lrm-provider.com/v1",
+        "model": "qwq-plus",
+        "temperature": 1.0,
+        "max_tokens": 4500
+      },
+      "rejection_sampling_n": 8,
+      "quality_threshold": 0.7,
+      "qa_type_ratios": {
+        "simple_factual": 0.05,
+        "complex_reasoning": 0.15,
+        "multi_hop": 0.15,
+        "analytical": 0.25,
+        "open_ended": 0.4
+      },
+      "cot_type_ratios": {
+        "short_cot": 0.1,
+        "long_cot": 0.9
+      },
+      "trajectory_filter": {
+        "format_validation": true,
+        "answer_correctness": true,
+        "quality_assessment": true,
+        "redundancy_check": true,
+        "alignment_check": false,
+        "reasoning_coherence": true
+      }
+    },
+
+    "technical_qa": {
+      "name": "技术问答配置",
+      "description": "专注于技术内容的问答生成",
+      "gpt4_config": {
+        "api_key": "your-gpt4-api-key-here",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4",
+        "temperature": 0.6,
+        "max_tokens": 2500
+      },
+      "lrm_config": {
+        "api_key": "your-lrm-api-key-here",
+        "base_url": "https://api.your-lrm-provider.com/v1",
+        "model": "qwq-plus",
+        "temperature": 0.7,
+        "max_tokens": 4000
+      },
+      "rejection_sampling_n": 7,
+      "quality_threshold": 0.78,
+      "qa_type_ratios": {
+        "simple_factual": 0.2,
+        "complex_reasoning": 0.35,
+        "multi_hop": 0.25,
+        "analytical": 0.15,
+        "open_ended": 0.05
+      },
+      "cot_type_ratios": {
+        "short_cot": 0.3,
+        "long_cot": 0.7
+      },
+      "trajectory_filter": {
+        "format_validation": true,
+        "answer_correctness": true,
+        "quality_assessment": true,
+        "redundancy_check": true,
+        "alignment_check": true,
+        "reasoning_coherence": true
+      }
+    }
+  },
+
+  "quality_thresholds": {
+    "strict": 0.9,
+    "high": 0.8,
+    "medium": 0.7,
+    "relaxed": 0.6,
+    "permissive": 0.5
+  },
+
+  "sampling_strategies": {
+    "conservative": {
+      "rejection_sampling_n": 3,
+      "description": "保守采样，速度优先"
+    },
+    "balanced": {
+      "rejection_sampling_n": 5,
+      "description": "平衡采样，质量与速度兼顾"
+    },
+    "thorough": {
+      "rejection_sampling_n": 8,
+      "description": "充分采样，质量优先"
+    },
+    "exhaustive": {
+      "rejection_sampling_n": 12,
+      "description": "穷尽采样，追求最高质量"
+    }
+  },
+
+  "cot_strategies": {
+    "short_focused": {
+      "short_cot": 0.8,
+      "long_cot": 0.2,
+      "description": "以短推理链为主，适合快速生成"
+    },
+    "balanced_cot": {
+      "short_cot": 0.5,
+      "long_cot": 0.5,
+      "description": "平衡推理链长度"
+    },
+    "long_focused": {
+      "short_cot": 0.2,
+      "long_cot": 0.8,
+      "description": "以长推理链为主，适合深度思考"
+    },
+    "deep_reasoning": {
+      "short_cot": 0.1,
+      "long_cot": 0.9,
+      "description": "深度推理，适合复杂问题"
+    }
+  },
+
+  "qa_type_presets": {
+    "factual_heavy": {
+      "simple_factual": 0.5,
+      "complex_reasoning": 0.2,
+      "multi_hop": 0.15,
+      "analytical": 0.1,
+      "open_ended": 0.05
+    },
+    "reasoning_heavy": {
+      "simple_factual": 0.1,
+      "complex_reasoning": 0.5,
+      "multi_hop": 0.25,
+      "analytical": 0.1,
+      "open_ended": 0.05
+    },
+    "analytical_heavy": {
+      "simple_factual": 0.1,
+      "complex_reasoning": 0.2,
+      "multi_hop": 0.2,
+      "analytical": 0.4,
+      "open_ended": 0.1
+    },
+    "open_ended_heavy": {
+      "simple_factual": 0.05,
+      "complex_reasoning": 0.15,
+      "multi_hop": 0.15,
+      "analytical": 0.25,
+      "open_ended": 0.4
+    },
+    "multi_hop_heavy": {
+      "simple_factual": 0.1,
+      "complex_reasoning": 0.2,
+      "multi_hop": 0.5,
+      "analytical": 0.15,
+      "open_ended": 0.05
+    }
+  },
+
+  "filter_presets": {
+    "strict_filter": {
+      "format_validation": true,
+      "answer_correctness": true,
+      "quality_assessment": true,
+      "redundancy_check": true,
+      "alignment_check": true,
+      "reasoning_coherence": true
+    },
+    "standard_filter": {
+      "format_validation": true,
+      "answer_correctness": true,
+      "quality_assessment": true,
+      "redundancy_check": true,
+      "alignment_check": true,
+      "reasoning_coherence": false
+    },
+    "basic_filter": {
+      "format_validation": true,
+      "answer_correctness": true,
+      "quality_assessment": false,
+      "redundancy_check": true,
+      "alignment_check": false,
+      "reasoning_coherence": false
+    },
+    "minimal_filter": {
+      "format_validation": true,
+      "answer_correctness": false,
+      "quality_assessment": false,
+      "redundancy_check": false,
+      "alignment_check": false,
+      "reasoning_coherence": false
+    }
+  },
+
+  "model_configs": {
+    "gpt4_standard": {
+      "model": "gpt-4",
+      "temperature": 0.7,
+      "max_tokens": 2000,
+      "top_p": 0.9
+    },
+    "gpt4_creative": {
+      "model": "gpt-4",
+      "temperature": 0.9,
+      "max_tokens": 2500,
+      "top_p": 0.95
+    },
+    "gpt4_precise": {
+      "model": "gpt-4",
+      "temperature": 0.5,
+      "max_tokens": 2000,
+      "top_p": 0.8
+    },
+    "lrm_standard": {
+      "model": "qwq-plus",
+      "temperature": 0.8,
+      "max_tokens": 3500,
+      "top_p": 0.9
+    },
+    "lrm_creative": {
+      "model": "qwq-plus",
+      "temperature": 1.0,
+      "max_tokens": 5000,
+      "top_p": 0.95
+    },
+    "lrm_precise": {
+      "model": "qwq-plus",
+      "temperature": 0.6,
+      "max_tokens": 3000,
+      "top_p": 0.85
+    }
+  },
+
+  "usage_scenarios": {
+    "academic_research": {
+      "recommended_template": "research_focused",
+      "description": "学术研究场景，重视创新性和深度思考"
+    },
+    "educational_content": {
+      "recommended_template": "education",
+      "description": "教育内容生成，需要多层次难度"
+    },
+    "technical_documentation": {
+      "recommended_template": "technical_qa",
+      "description": "技术文档问答，注重准确性和逻辑性"
+    },
+    "content_creation": {
+      "recommended_template": "creative_thinking",
+      "description": "内容创作，鼓励创新思维"
+    },
+    "batch_processing": {
+      "recommended_template": "fast_generation",
+      "description": "批量处理，平衡质量和效率"
+    },
+    "premium_service": {
+      "recommended_template": "high_quality",
+      "description": "高端服务，追求最高质量"
+    }
+  }
+}
