@@ -1,6 +1,6 @@
 import os
 from openai import OpenAI, AsyncOpenAI
-from TextGeneration.prompts_conf import system_prompt, user_prompts
+from TextGeneration.prompts_conf import system_prompt, all_prompts
 import asyncio
 import json
 import pandas as pd
@@ -16,6 +16,32 @@ async def get_response(input_prompt, api_key=api_key, qwen_url=ark_url, model=mo
     """
     Get response from the model for text-only input.
     """
+    # Check if we should use mock mode
+    use_mock = os.environ.get('USE_MOCK_API', 'false').lower() == 'true'
+    
+    if use_mock:
+        # Return mock QA data
+        mock_response = {
+            "qa_pairs": [
+                {
+                    "question": "What is the main topic discussed in this text?",
+                    "answer": "The text discusses semiconductor technology and its applications in modern electronics.",
+                    "question_type": "factual",
+                    "difficulty": "intermediate",
+                    "reasoning": "Based on the content analysis of the provided text."
+                }
+            ],
+            "key_concepts": ["semiconductor", "electronics", "technology"],
+            "technical_details": {
+                "materials": ["silicon", "germanium"],
+                "parameters": ["conductivity", "band gap"],
+                "methods": ["doping", "lithography"]
+            },
+            "main_findings": ["Semiconductors are fundamental to modern electronics"]
+        }
+        
+        return (json.dumps(mock_response, ensure_ascii=False), "Mock reasoning process")
+    
     client = AsyncOpenAI(
         api_key=api_key,
         base_url=qwen_url if qwen_url != None else None,
@@ -81,10 +107,10 @@ async def get_total_responses(index, file_path, pool_size=10, stream=False):
     
     # Question type distribution (adjusted for requirements)
     question_type_prompts = {
-        'factual': 43,      # 15%
-        'comparison': 44,   # 15%
-        'reasoning': 45,    # 50%
-        'open_ended': 46    # 20%
+        'factual': 'text_qa_basic',      # 15%
+        'comparison': 'text_qa_basic',   # 15%
+        'reasoning': 'text_qa_advanced',    # 50%
+        'open_ended': 'text_qa_advanced'    # 20%
     }
     
     # Target distribution
@@ -122,7 +148,7 @@ async def get_total_responses(index, file_path, pool_size=10, stream=False):
         # Create tasks for each question type
         for q_type in question_types_to_generate:
             prompt_index = question_type_prompts[q_type]
-            input_prompt = user_prompts[prompt_index]
+            input_prompt = all_prompts[prompt_index]
             
             # Format the prompt with the context
             final_input = input_prompt.format(
@@ -143,7 +169,7 @@ async def get_total_responses(index, file_path, pool_size=10, stream=False):
         batch_results = await asyncio.gather(*[task for task, _, _ in batch_tasks])
         
         # Process results
-        for j, (result, _) in enumerate(batch_results):
+        for j, result in enumerate(batch_results):
             task, source_file, q_type = batch_tasks[j]
             content, reasoning = result
             
@@ -223,10 +249,10 @@ async def check_data_quality(url, key, model, output_file, prompt_indexes, pool_
         tasks = []
         for _ in range(check_times):
             if type(prompt_indexes) == int:
-                input_prompt = user_prompts[prompt_indexes]
+                input_prompt = all_prompts[prompt_indexes]
             else:
                 index = _ % len(prompt_indexes)
-                input_prompt = user_prompts[prompt_indexes[index]]
+                input_prompt = all_prompts[prompt_indexes[index]]
             
             final_input = input_prompt.format(**sample)
             task = asyncio.create_task(

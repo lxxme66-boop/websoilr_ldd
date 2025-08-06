@@ -14,46 +14,63 @@ def clean_process(input_file,output_file,copy_parsed_pdf=False,):
     output_json = []
     import json
     for i in range(len(data)):
-        
-        
-        
         try:
-            content = data[i]['content']
-            matches = pattern.findall(content)
-            if matches:
-                json_dict_str = matches[-1]
-                response = eval(json_dict_str)
+            # Check if this is text-only data or multimodal data
+            if 'image_path' in data[i]:
+                # Multimodal data processing
+                content = data[i]['content']
+                matches = pattern.findall(content)
+                if matches:
+                    json_dict_str = matches[-1]
+                    response = eval(json_dict_str)
+                else:
+                    continue
+                    
+                img_path = data[i]['image_path']
+                img_path = img_path.split("/")[-3:]
+                img_path = "/".join(img_path)
+                img_path = "./" + img_path
+                response['image_path'] = img_path
             else:
-                continue
+                # Text-only data processing
+                response = {
+                    'content': data[i].get('content', ''),
+                    'source_file': data[i].get('source_file', ''),
+                    'text_content': data[i].get('text_content', ''),
+                    'qa_pairs': data[i].get('qa_pairs', [])
+                }
+                
+                # If content contains QA pairs in specific format, extract them
+                if 'qa_pairs' not in data[i] and 'content' in data[i]:
+                    content = data[i]['content']
+                    # Try to extract QA pairs from content if they exist
+                    matches = pattern.findall(content)
+                    if matches:
+                        try:
+                            json_dict_str = matches[-1]
+                            extracted = eval(json_dict_str)
+                            response.update(extracted)
+                        except:
+                            pass
+
+            output_json.append(response)
+            
+            if copy_parsed_pdf and 'image_path' in data[i]:
+                image_path = data[i]['image_path']
+                # copy the folder of image_path to the new folder
+                # only select the first 200
+                folder_path = os.path.join(output_file, image_path.split("/")[-3])
+                # original folder path
+                original_path = image_path.split("/")
+                original_path = "/".join(original_path[:-2])
+                # copy the folder
+                os.makedirs(folder_path, exist_ok=True)
+                # copy original_path to folder_path
+                os.system(f"cp -r {original_path} {folder_path}")
+                
         except Exception as e:
             print(f"Error parsing content for index {i}: {e}")
-            #print(content)
             continue
-        img_path =data[i]['image_path']
-        img_path = img_path.split("/")[-3:]
-
-        img_path = "/".join(img_path)
-        img_path = "./" + img_path
-        response['image_path'] = img_path
-        
-        # try to obtain the answer in the format of array index
-        
-
-
-        output_json.append(response)
-        #print(response)
-        if copy_parsed_pdf:
-            image_path = data[i]['image_path']
-            # copy the folder of image_path to the new folder
-            # only select the first 200
-            folder_path = os.path.join(output_file, image_path.split("/")[-3])
-            # original folder path
-            original_path = image_path.split("/")
-            original_path = "/".join(original_path[:-2])
-            # copy the folder
-            os.makedirs(folder_path, exist_ok=True)
-            # copy original_path to folder_path
-            os.system(f"cp -r {original_path} {folder_path}")
       
     
     with open(os.path.join(output_file,"total_response.json"),  "w",

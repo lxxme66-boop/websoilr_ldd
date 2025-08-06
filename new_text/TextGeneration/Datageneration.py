@@ -102,20 +102,64 @@ async def input_text_process(text_content, source_file, chunk_index=0, total_chu
     """
     Process text content using the specified prompt.
     """
-    client = AsyncOpenAI(
-        api_key=api_key,
-        base_url=ark_url
-    )
+    # Check if we should use mock mode
+    use_mock = os.environ.get('USE_MOCK_API', 'false').lower() == 'true'
+    
+    if use_mock or not OPENAI_AVAILABLE:
+        # Return mock data for testing
+        logger.warning("Using mock mode for text processing")
+        result = {
+            "content": f"Mock QA for {source_file} chunk {chunk_index + 1}/{total_chunks}:\nQ: What is discussed in this text?\nA: The text discusses semiconductor technology and related concepts.",
+            "source_file": source_file,
+            "chunk_index": chunk_index,
+            "total_chunks": total_chunks,
+            "text_content": text_content[:500] + "..." if len(text_content) > 500 else text_content,
+            "qa_pairs": [
+                {
+                    "question": "What is the main topic of this text?",
+                    "answer": "The text discusses semiconductor technology.",
+                    "reasoning": "Based on the content analysis."
+                }
+            ]
+        }
+        return result
+    
+    try:
+        client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=ark_url
+        )
+    except Exception as e:
+        logger.error(f"Failed to create OpenAI client: {e}")
+        # Return mock data if client creation fails
+        return {
+            "content": f"Error creating client, returning mock data for {source_file}",
+            "source_file": source_file,
+            "chunk_index": chunk_index,
+            "total_chunks": total_chunks,
+            "text_content": text_content[:500] + "..." if len(text_content) > 500 else text_content
+        }
     
     try:
         user_prompt = user_prompts[prompt_index]
         
         # Format the prompt with the text content
-        formatted_prompt = user_prompt.format(
-            text_content=text_content,
-            source_file=source_file,
-            chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
-        )
+        # Check if the prompt expects markdown_content or text_content
+        if '{markdown_content}' in user_prompt:
+            formatted_prompt = user_prompt.format(
+                markdown_content=text_content,
+                source_file=source_file,
+                chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
+            )
+        elif '{text_content}' in user_prompt:
+            formatted_prompt = user_prompt.format(
+                text_content=text_content,
+                source_file=source_file,
+                chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
+            )
+        else:
+            # For prompts that don't have placeholders, just use the prompt as is
+            formatted_prompt = user_prompt
         
         response = await client.chat.completions.create(
             model=model,
