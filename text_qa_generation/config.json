@@ -38,7 +38,14 @@
     "quality_control": {
         "check_times": 5,
         "pass_score": 1,
-        "check_indexes": [40, 37, 38]
+        "check_indexes": [40, 37, 38],
+        "enhanced_quality_check": {
+            "enabled": true,
+            "parallel_core": 10,
+            "activate_stream": false,
+            "quality_threshold": 0.7,
+            "verification_method": "dual_stage"
+        }
     },
     "output": {
         "formats": ["json", "csv"],
