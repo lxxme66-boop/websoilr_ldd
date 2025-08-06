@@ -1,9 +1,18 @@
 {
   "system_info": {
-    "name": "智能文本QA生成系统",
-    "version": "1.0.0",
-    "description": "整合了数据召回、清理、QA生成和质量控制的完整流水线",
-    "last_updated": "2024-12-20"
+    "name": "智能文本QA生成系统 - 整合版",
+    "version": "2.0.0",
+    "description": "功能完整的智能文本问答生成系统，整合了文本召回、数据处理、QA生成、质量控制、多模态处理和本地模型支持",
+    "last_updated": "2024-12-20",
+    "features": [
+      "文本召回与检索",
+      "多模态PDF处理", 
+      "智能QA生成",
+      "增强质量控制",
+      "本地模型支持",
+      "专业领域定制",
+      "数据改写增强"
+    ]
   },
   
   "api": {
@@ -11,14 +20,16 @@
     "api_key": "ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b",
     "timeout": 600,
     "max_retries": 3,
-    "retry_delay": 1
+    "retry_delay": 1,
+    "use_local_models": false,
+    "local_model_priority": ["ollama", "vllm", "transformers"]
   },
   
   "models": {
     "default_model": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
     "qa_generator_model": {
+      "type": "openai_compatible",
       "path": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
-      "type": "api",
       "temperature": 0.8,
       "max_tokens": 4096,
       "top_p": 0.9
@@ -32,12 +43,30 @@
         "enabled": false,
         "base_url": "http://localhost:11434",
         "model_name": "qwen:7b",
-        "timeout": 300
+        "timeout": 300,
+        "models_available": ["llama2", "codellama", "mistral", "qwen", "deepseek-coder"]
       },
       "vllm": {
         "enabled": false,
         "base_url": "http://localhost:8000",
-        "model_name": "Qwen/Qwen-7B-Chat"
+        "model_name": "Qwen/Qwen2-7B-Instruct",
+        "timeout": 300
+      },
+      "transformers": {
+        "enabled": false,
+        "model_name": "Qwen/Qwen2-7B-Instruct",
+        "device": "auto",
+        "torch_dtype": "auto",
+        "load_in_4bit": false,
+        "load_in_8bit": false
+      }
+    },
+    "multimodal_models": {
+      "vision_model": {
+        "type": "openai_compatible",
+        "path": "gpt-4-vision-preview",
+        "supports_images": true,
+        "max_image_size": "1024x1024"
       }
     }
   },
@@ -50,7 +79,10 @@
     "selected_task_number": 1000,
     "parallel_batch_size": 100,
     "memory_limit": "16GB",
-    "enable_caching": true
+    "enable_caching": true,
+    "chunk_size": 2000,
+    "chunk_overlap": 200,
+    "max_tasks": 1000
   },
   
   "data_retrieval": {
@@ -58,7 +90,9 @@
       "max_pages_per_document": 100,
       "image_extraction": true,
       "text_extraction": true,
-      "extract_tables": true
+      "extract_tables": true,
+      "dpi": 200,
+      "image_format": "png"
     },
     "retrieval_indices": {
       "default": 43,
@@ -85,15 +119,26 @@
     }
   },
   
-  "qa_generation": {
-    "default_prompts": {
-      "semiconductor": [343, 3431, 3432],
-      "optics": [343, 3431, 3432],
-      "materials": [343, 3431, 3432]
+  "question_generation": {
+    "question_types": ["factual", "comparison", "reasoning", "open_ended"],
+    "question_type_ratios": {
+      "factual": 0.15,
+      "comparison": 0.15,
+      "reasoning": 0.50,
+      "open_ended": 0.20
+    },
+    "prompt_indexes": {
+      "knowledge_extraction": 9,
+      "factual": 43,
+      "comparison": 44,
+      "reasoning": 45,
+      "open_ended": 46,
+      "comprehensive": 343,
+      "multimodal": [343, 3431, 3432],
+      "professional": [34, 35, 36, 37, 38, 39, 40]
     },
     "generation_params": {
       "max_questions_per_image": 3,
-      "question_types": ["factual", "reasoning", "comparison", "application"],
       "answer_format": "multiple_choice",
       "min_choices": 3,
       "max_choices": 4
@@ -115,7 +160,12 @@
     },
     "enhanced_quality_check": {
       "enabled": true,
+      "parallel_core": 10,
+      "activate_stream": false,
       "quality_threshold": 0.7,
+      "verification_method": "dual_stage",
+      "use_multiple_models": false,
+      "quality_models": ["ollama", "api"],
       "dimensions": [
         "reasoning_validity",
         "question_clarity", 
@@ -131,9 +181,23 @@
     }
   },
   
-  "domains": {
+  "professional_domains": {
+    "enabled": true,
+    "default_domain": "semiconductor",
+    "available_domains": [
+      "semiconductor",
+      "optics", 
+      "materials",
+      "physics",
+      "chemistry",
+      "electronics"
+    ],
+    "domain_specific_prompts": {
+      "semiconductor": [343, 3431, 3432],
+      "optics": [343, 3431, 3432],
+      "materials": [343, 3431, 3432]
+    },
     "semiconductor": {
-      "prompts": [343, 3431, 3432],
       "keywords": ["IGZO", "TFT", "OLED", "半导体", "晶体管", "能带", "载流子"],
       "quality_criteria": "high",
       "specific_checks": ["technical_accuracy", "formula_validity"],
@@ -144,7 +208,6 @@
       }
     },
     "optics": {
-      "prompts": [343, 3431, 3432],
       "keywords": ["光谱", "光学", "激光", "折射", "反射", "衍射", "干涉"],
       "quality_criteria": "high",
       "specific_checks": ["wavelength_accuracy", "optical_principles"],
@@ -155,7 +218,6 @@
       }
     },
     "materials": {
-      "prompts": [343, 3431, 3432],
       "keywords": ["材料", "晶体", "聚合物", "复合材料", "表面", "界面"],
       "quality_criteria": "high",
       "specific_checks": ["material_properties", "structure_analysis"],
@@ -167,7 +229,36 @@
     }
   },
   
-  "output_formats": {
+  "multimodal": {
+    "enabled": true,
+    "pdf_processing": {
+      "extract_images": true,
+      "extract_text": true,
+      "dpi": 200,
+      "image_format": "png"
+    },
+    "image_processing": {
+      "max_size": "1024x1024",
+      "formats": ["png", "jpg", "jpeg", "webp"],
+      "encode_base64": true
+    }
+  },
+  
+  "rewriting": {
+    "enabled": true,
+    "rewrite_ratio": 0.3,
+    "quality_improvement": true,
+    "professional_enhancement": true,
+    "template_types": ["basic", "advanced", "professional"],
+    "concurrency": 5
+  },
+  
+  "output": {
+    "formats": ["json", "csv"],
+    "include_statistics": true,
+    "include_source_mapping": true,
+    "separate_by_domain": true,
+    "include_images": true,
     "qa_pair": {
       "required_fields": ["question", "answer", "reasoning"],
       "optional_fields": ["choices", "context", "lecture", "image_path"],
@@ -210,6 +301,9 @@
   "logging": {
     "level": "INFO",
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "logs/text_qa_generation.log",
+    "max_file_size": "10MB",
+    "backup_count": 5,
     "handlers": {
       "file": {
         "enabled": true,
