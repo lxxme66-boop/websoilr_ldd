@@ -19,7 +19,28 @@ except ImportError:
     OPENAI_AVAILABLE = False
     print("Warning: openai not available")
 
+# Import local model support
+try:
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from LocalModels.ollama_client import OllamaClient
+    LOCAL_MODEL_AVAILABLE = True
+except ImportError:
+    LOCAL_MODEL_AVAILABLE = False
+    print("Warning: Local model support not available")
+
 from .prompts_conf import system_prompt, user_prompts
+
+# Load configuration
+config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
+if os.path.exists(config_path):
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+        use_local_models = config.get('api', {}).get('use_local_models', False)
+        local_model_config = config.get('models', {}).get('local_models', {}).get('ollama', {})
+else:
+    use_local_models = False
+    local_model_config = {}
 
 # API configuration
 ark_url = "http://0.0.0.0:8080/v1"
@@ -105,7 +126,7 @@ async def input_text_process(text_content, source_file, chunk_index=0, total_chu
     # Check if we should use mock mode
     use_mock = os.environ.get('USE_MOCK_API', 'false').lower() == 'true'
     
-    if use_mock or not OPENAI_AVAILABLE:
+    if use_mock:
         # Return mock data for testing
         logger.warning("Using mock mode for text processing")
         result = {
@@ -123,6 +144,74 @@ async def input_text_process(text_content, source_file, chunk_index=0, total_chu
             ]
         }
         return result
+    
+    # Check if we should use local models
+    if use_local_models and LOCAL_MODEL_AVAILABLE:
+        logger.info("Using local model for text processing")
+        try:
+            ollama_client = OllamaClient(
+                base_url=local_model_config.get('base_url', 'http://localhost:11434'),
+                model_name=local_model_config.get('model_name', 'qwen:7b'),
+                timeout=local_model_config.get('timeout', 300)
+            )
+            
+            # Check if Ollama is available
+            if not ollama_client.check_connection():
+                logger.error("Cannot connect to Ollama service")
+                raise Exception("Ollama service not available")
+            
+            # Use local model for generation
+            user_prompt = user_prompts[prompt_index]
+            
+            # Format the prompt
+            if '{markdown_content}' in user_prompt:
+                formatted_prompt = user_prompt.format(
+                    markdown_content=text_content,
+                    source_file=source_file,
+                    chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
+                )
+            elif '{text_content}' in user_prompt:
+                formatted_prompt = user_prompt.format(
+                    text_content=text_content,
+                    source_file=source_file,
+                    chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
+                )
+            else:
+                formatted_prompt = user_prompt
+            
+            # Create messages for chat
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": formatted_prompt}
+            ]
+            
+            # Generate response using Ollama
+            response_content = await ollama_client.chat(messages, temperature=0.8, max_tokens=4096)
+            
+            if response_content:
+                result = {
+                    "content": response_content,
+                    "source_file": source_file,
+                    "chunk_index": chunk_index,
+                    "total_chunks": total_chunks,
+                    "text_content": text_content[:500] + "..." if len(text_content) > 500 else text_content,
+                    "model_used": "ollama/" + local_model_config.get('model_name', 'qwen:7b')
+                }
+                logger.info(f"Successfully processed chunk {chunk_index + 1}/{total_chunks} from {source_file} using local model")
+                return result
+            else:
+                logger.error("Failed to get response from local model")
+                raise Exception("No response from local model")
+                
+        except Exception as e:
+            logger.error(f"Error using local model: {e}")
+            logger.info("Falling back to API model")
+            # Fall through to use API model
+    
+    # Use API model (original logic)
+    if not OPENAI_AVAILABLE:
+        logger.error("OpenAI library not available and local models not configured")
+        return None
     
     try:
         client = AsyncOpenAI(
