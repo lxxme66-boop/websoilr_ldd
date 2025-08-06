@@ -25,7 +25,8 @@
     "max_retries": 3,
     "retry_delay": 1,
     "use_local_models": true,
-    "local_model_priority": ["ollama", "vllm", "transformers"]
+    "local_model_type": "skywork",
+    "local_model_priority": ["skywork", "ollama", "vllm", "transformers"]
   },
   
   "models": {
@@ -68,6 +69,25 @@
         "torch_dtype": "auto",
         "load_in_4bit": false,
         "load_in_8bit": false
+      }
+    },
+    "skywork": {
+      "enabled": true,
+      "client_type": "vllm",
+      "base_url": "http://localhost:8000",
+      "model_path": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
+      "timeout": 600,
+      "temperature": 0.8,
+      "max_tokens": 4096,
+      "top_p": 0.9,
+      "device": "auto",
+      "load_in_8bit": false,
+      "load_in_4bit": false,
+      "vllm_config": {
+        "tensor_parallel_size": 1,
+        "gpu_memory_utilization": 0.9,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 256
       }
     },
     "multimodal_models": {
