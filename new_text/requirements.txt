@@ -105,3 +105,11 @@ line-profiler>=4.0.0     # 性能分析
 chardet>=5.0.0    # 字符编码检测
 python-magic>=0.4.27  # 文件类型检测
 python-dateutil>=2.8.0  # 日期处理
+
+# 本地模型支持
+vllm>=0.2.0  # vLLM模型服务
+torch>=2.0.0  # PyTorch（vLLM依赖）
+transformers>=4.35.0  # Hugging Face transformers
+accelerate>=0.24.0  # 模型加速
+sentencepiece>=0.1.99  # 分词器
+protobuf>=3.20.0  # 协议缓冲区
