@@ -1,213 +1,247 @@
-# 智能文本QA生成系统 - 整合版
+# 智能文本QA生成系统 - 整合版 v2.0
 
-一个功能完整的智能文本问答生成系统，整合了文本召回、数据处理、QA生成、质量控制、多模态处理和本地模型支持功能，专注于半导体、光学等专业领域。
+## 目录
+- [系统概述](#系统概述)
+- [核心功能](#核心功能)
+- [系统架构](#系统架构)
+- [安装部署](#安装部署)
+- [使用指南](#使用指南)
+- [本地模型支持](#本地模型支持)
+- [配置说明](#配置说明)
+- [API文档](#api文档)
+- [故障排除](#故障排除)
 
-## 🌟 核心特性
+## 系统概述
 
-### 📊 完整数据流水线
-- **文本召回**：从PDF文档中智能提取和召回相关文本内容
-- **数据清理**：使用正则表达式和AI技术进行数据后处理
-- **QA生成**：基于专业领域知识生成高质量问答对
-- **质量控制**：多维度质量检查和自动改进
-- **最终整理**：生成完整的报告和统计信息
+智能文本QA生成系统是一个功能完整的端到端解决方案，用于从各种文档（PDF、文本文件）中自动生成高质量的问答对。系统支持多种大语言模型后端，包括API服务和本地模型部署。
 
-### 🔬 专业领域支持
-- **半导体物理**：IGZO、TFT、OLED、能带理论等
-- **光学与光电子**：光谱分析、器件特性、光子吸收等
-- **材料科学**：材料特性、制备工艺等
-- **36+专业Prompt模板**：覆盖各种专业场景
-- **领域特定质量检查**：针对不同领域的专业准确性验证
+### 主要特性
+- 🚀 **高性能处理**: 支持批量并发处理，自动任务调度
+- 🤖 **多模型支持**: 支持API和本地模型（vLLM、Transformers、Ollama）
+- 📄 **多格式支持**: PDF、TXT、Markdown等文档格式
+- 🎯 **专业领域定制**: 半导体、光学、材料等专业领域优化
+- 🔍 **智能质量控制**: 多维度质量评估和自动改进
+- 📊 **完整的流水线**: 从文档到高质量QA对的全自动化流程
 
-### 🤖 多模型支持
-- **云端API模型**：豆包、Qwen、GPT等OpenAI兼容接口
-- **本地模型支持**：
-  - Ollama集成（llama2, codellama, mistral, qwen等）
-  - vLLM高性能推理服务
-  - Transformers本地加载
-- **智能模型切换**：根据任务自动选择最佳模型
-- **混合部署**：支持云端和本地模型混合使用
+## 核心功能
 
-### 📚 多模态处理
-- **PDF文档处理**：自动提取文本和图像，支持复杂学术论文
-- **图文结合问答**：基于图片和文本内容生成高质量问答对
-- **专业图表分析**：支持半导体、光学等专业领域的图表分析
-- **多格式支持**：PNG、JPG、JPEG、WebP等图像格式
+### 1. 文本召回与检索 (Text Retrieval)
+- **功能描述**: 从原始文档中提取和预处理文本内容
+- **支持格式**: 
+  - PDF文件（支持多种提取引擎：PyMuPDF、pdfplumber、PyPDF2）
+  - 文本文件（.txt、.text、.md）
+  - 支持中英文混合文档
+- **智能分块**: 自动将长文档分割成适合处理的块，保持语义完整性
+- **历史记录**: 支持断点续传，避免重复处理
 
-### 🚀 高性能处理
-- **异步批处理**：支持大规模并发处理
-- **多进程架构**：充分利用多核CPU资源
-- **内存优化**：智能内存管理和缓存机制
-- **自适应调度**：根据系统负载动态调整处理策略
+### 2. 数据清理与预处理 (Data Cleaning)
+- **文本标准化**: 去除多余空白、统一编码格式
+- **格式化处理**: 保持原文档的结构信息（标题、列表、表格等）
+- **噪声过滤**: 去除无意义的字符和格式噪声
+- **内容验证**: 确保提取的文本质量符合后续处理要求
 
-### 🔍 增强质量控制
-- **多维度检查**：推理有效性、问题清晰度、答案正确性、图片依赖性
-- **双阶段验证**：初步筛选 + 深度质量检查
-- **自动改进**：基于质量反馈自动优化生成结果
-- **质量报告**：详细的质量分析和统计报告
+### 3. 智能QA生成 (QA Generation)
+- **多类型问题生成**:
+  - 事实性问题 (Factual): 基于文档事实的直接问答
+  - 比较性问题 (Comparison): 概念、方法的对比分析
+  - 推理性问题 (Reasoning): 需要逻辑推理的深度问题
+  - 开放性问题 (Open-ended): 探索性、创造性思考题
+- **上下文感知**: 保持问答与原文的语义关联
+- **专业领域优化**: 针对特定领域生成专业问题
 
-## 📦 项目结构
+### 4. 增强质量控制 (Quality Control)
+- **多维度评估**:
+  - 推理有效性 (Reasoning Validity)
+  - 问题清晰度 (Question Clarity)
+  - 答案正确性 (Answer Correctness)
+  - 领域相关性 (Domain Relevance)
+- **自动改进机制**: 低质量QA对的自动重新生成
+- **人工审核接口**: 支持人工干预和质量标注
+
+### 5. 多模态处理 (Multimodal Processing)
+- **图像理解**: 从PDF中提取图像并生成相关问答
+- **图表分析**: 理解图表、流程图等视觉信息
+- **文图结合**: 生成需要结合文本和图像的综合性问题
+
+### 6. 本地模型支持 (Local Models)
+- **vLLM**: 高性能推理引擎，支持大规模模型部署
+- **Transformers**: HuggingFace生态系统，灵活的模型加载
+- **Ollama**: 简单易用的本地模型管理工具
+- **自动选择**: 根据配置自动选择最优的模型后端
+
+## 系统架构
 
 ```
-├── README.md                           # 项目说明文档
-├── requirements.txt                    # 完整依赖包列表
-├── run_pipeline.py                     # 统一流水线脚本
-├── config.json                         # 统一配置文件
-│
-├── TextQA/                            # QA处理核心模块
-│   ├── dataargument.py                # 数据处理和QA生成
-│   └── enhanced_quality_checker.py     # 增强质量检查
-│
-├── TextGeneration/                    # 文本生成模块
-│   ├── Datageneration.py             # 数据生成逻辑
-│   └── prompts_conf.py                # 36+专业Prompt配置
-│
-├── LocalModels/                       # 本地模型支持
-│   └── ollama_client.py               # Ollama客户端
-│
-├── MultiModal/                        # 多模态处理
-│   └── pdf_processor.py              # PDF处理器
-│
-├── data_retrieval/                    # 数据召回模块
-│   ├── doubao_main_batch_inference.py # 主批处理推理
-│   ├── clean_data.py                 # 数据清理
-│   └── qwen_argument.py              # QA构造
-│
-├── Doubao/                           # 豆包模型集成
-├── Qwen/                             # Qwen模型集成  
-├── WizardLM/                         # WizardLM模型集成
-└── Utilis/                           # 工具函数
+┌─────────────────────────────────────────────────────────────┐
+│                        输入层 (Input Layer)                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  PDF Files  │  │  Text Files │  │   Images    │        │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘        │
+└─────────┼─────────────────┼─────────────────┼──────────────┘
+          │                 │                 │
+┌─────────▼─────────────────▼─────────────────▼──────────────┐
+│                    处理层 (Processing Layer)                 │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │            文本提取与预处理 (Text Extraction)          │  │
+│  │  - PDF解析    - 文本分块    - 格式标准化             │  │
+│  └─────────────────────┬───────────────────────────────┘  │
+│                        │                                    │
+│  ┌─────────────────────▼───────────────────────────────┐  │
+│  │              QA生成引擎 (QA Generation Engine)        │  │
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐            │  │
+│  │  │  Local  │  │   API   │  │ Prompts │            │  │
+│  │  │ Models  │  │ Models  │  │ Library │            │  │
+│  │  └─────────┘  └─────────┘  └─────────┘            │  │
+│  └─────────────────────┬───────────────────────────────┘  │
+│                        │                                    │
+│  ┌─────────────────────▼───────────────────────────────┐  │
+│  │            质量控制系统 (Quality Control)             │  │
+│  │  - 多维度评估    - 自动改进    - 人工审核接口        │  │
+│  └─────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────┘
+          │
+┌─────────▼───────────────────────────────────────────────────┐
+│                      输出层 (Output Layer)                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  JSON Files │  │  CSV Files  │  │   Reports   │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## 🚀 快速开始
+## 安装部署
 
-### 1. 环境安装
+### 系统要求
+- Python 3.8+
+- CUDA 11.8+ (用于GPU加速)
+- 内存: 建议32GB以上
+- 存储: 根据模型大小，建议预留100GB以上
 
+### 安装步骤
+
+1. **克隆仓库**
 ```bash
-# 克隆项目
-git clone <repository-url>
-cd intelligent-qa-generation
+git clone <repository_url>
+cd text_qa_generation
+```
 
-# 安装基础依赖
+2. **创建虚拟环境**
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 或
+venv\Scripts\activate  # Windows
+```
+
+3. **安装依赖**
+```bash
 pip install -r requirements.txt
-
-# 可选：安装多模态支持
-pip install PyMuPDF Pillow opencv-python
-
-# 可选：安装本地模型支持
-pip install ollama transformers torch torchvision
 ```
 
-### 2. 配置设置
-
+4. **安装本地模型支持（可选）**
 ```bash
-# 编辑配置文件，设置API密钥和模型路径
-nano config.json
+# vLLM支持
+pip install vllm
+
+# Transformers支持
+pip install transformers accelerate bitsandbytes
+
+# Ollama支持
+# 访问 https://ollama.ai 下载安装
 ```
 
-**重要配置项**：
+### 快速开始
+
+#### 一键运行
+```bash
+# 使用默认配置运行完整流水线
+bash run_all.sh
+
+# 或使用Python脚本
+python run_pipeline.py --config config.json
+```
+
+#### 分步运行
+```bash
+# 步骤1: 文本提取
+python run_pipeline.py --stage text_retrieval
+
+# 步骤2: 数据清理
+python run_pipeline.py --stage data_cleaning
+
+# 步骤3: QA生成
+python run_pipeline.py --stage qa_generation
+
+# 步骤4: 质量控制
+python run_pipeline.py --stage quality_control
+```
+
+## 本地模型支持
+
+### vLLM配置
+vLLM是推荐的本地模型部署方案，提供最佳的推理性能。
+
+1. **启动vLLM服务**
+```bash
+python -m vllm.entrypoints.openai.api_server \
+    --model /mnt/storage/models/Skywork/Skywork-R1V3-38B \
+    --port 8000 \
+    --gpu-memory-utilization 0.9 \
+    --max-model-len 32768
+```
+
+2. **配置config.json**
 ```json
 {
   "api": {
-    "ark_url": "http://your-api-endpoint/v1",
-    "api_key": "your-api-key-here"
+    "use_local_models": true,
+    "local_model_priority": ["vllm", "transformers", "ollama"]
   },
   "models": {
-    "qa_generator_model": {
-      "path": "/path/to/your/model"
+    "local_models": {
+      "vllm": {
+        "enabled": true,
+        "base_url": "http://localhost:8000",
+        "model_name": "/mnt/storage/models/Skywork/Skywork-R1V3-38B"
+      }
     }
-  },
-  "professional_domains": {
-    "default_domain": "semiconductor"
   }
 }
 ```
 
-### 3. 一键运行
+### Transformers配置
+适合需要更多自定义控制的场景。
 
-#### 完整流水线处理
-```bash
-# 处理PDF文件夹，生成半导体领域QA
-python run_pipeline.py \
-    --mode full_pipeline \
-    --input_path data/pdfs/semiconductor_papers \
-    --domain semiconductor
-
-# 处理光学领域文档
-python run_pipeline.py \
-    --mode full_pipeline \
-    --input_path data/pdfs/optics_papers \
-    --domain optics \
-    --quality_threshold 0.8
-```
-
-#### 使用本地模型
-```bash
-# 启动Ollama服务
-ollama serve
-
-# 使用本地模型运行
-python run_pipeline.py \
-    --mode full_pipeline \
-    --input_path data/pdfs \
-    --domain semiconductor \
-    --use_local_models \
-    --enable_multimodal
-```
-
-### 4. 分步骤运行
-
-**步骤1：文本召回**
-```bash
-python run_pipeline.py \
-    --mode text_retrieval \
-    --input_path data/pdfs \
-    --domain semiconductor
-```
-
-**步骤2：数据清理**
-```bash
-python run_pipeline.py \
-    --mode data_cleaning \
-    --input_path data/retrieved/total_response.pkl
-```
-
-**步骤3：QA生成**
-```bash
-python run_pipeline.py \
-    --mode qa_generation \
-    --input_path data/cleaned/total_response.json \
-    --domain semiconductor
-```
-
-**步骤4：质量控制**
-```bash
-python run_pipeline.py \
-    --mode quality_control \
-    --input_path data/qa_results/results_343.json \
-    --quality_threshold 0.7
-```
-
-## ⚙️ 配置说明
-
-### 基础配置
 ```json
 {
-  "system_info": {
-    "name": "智能文本QA生成系统 - 整合版",
-    "version": "2.0.0",
-    "features": [
-      "文本召回与检索",
-      "多模态PDF处理", 
-      "智能QA生成",
-      "增强质量控制",
-      "本地模型支持",
-      "专业领域定制"
-    ]
+  "models": {
+    "local_models": {
+      "transformers": {
+        "enabled": true,
+        "model_name": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
+        "device": "auto",
+        "torch_dtype": "auto",
+        "load_in_4bit": false,
+        "load_in_8bit": false
+      }
+    }
   }
 }
 ```
 
-### 模型配置
+### Ollama配置
+最简单的本地模型部署方案。
+
+1. **安装Ollama**
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
+```
+
+2. **下载模型**
+```bash
+ollama pull qwen:7b
+```
+
+3. **配置使用**
 ```json
 {
   "models": {
@@ -216,427 +250,246 @@ python run_pipeline.py \
         "enabled": true,
         "base_url": "http://localhost:11434",
         "model_name": "qwen:7b"
-      },
-      "vllm": {
-        "enabled": false,
-        "base_url": "http://localhost:8000",
-        "model_name": "Qwen/Qwen2-7B-Instruct"
       }
     }
   }
 }
 ```
 
+## 配置说明
+
+### 核心配置项
+
+#### API配置
+```json
+{
+  "api": {
+    "use_local_models": true,  // 是否使用本地模型
+    "local_model_priority": ["vllm", "transformers", "ollama"],  // 优先级顺序
+    "timeout": 600,  // 请求超时时间（秒）
+    "max_retries": 3  // 最大重试次数
+  }
+}
+```
+
+#### 处理配置
+```json
+{
+  "processing": {
+    "batch_size": 100,  // 批处理大小
+    "max_concurrent": 20,  // 最大并发数
+    "chunk_size": 2000,  // 文本分块大小
+    "chunk_overlap": 200  // 分块重叠大小
+  }
+}
+```
+
+#### 质量控制配置
+```json
+{
+  "quality_control": {
+    "enhanced_quality_check": {
+      "enabled": true,
+      "quality_threshold": 0.7,  // 质量阈值
+      "dimensions": [  // 评估维度
+        "reasoning_validity",
+        "question_clarity",
+        "answer_correctness",
+        "domain_relevance"
+      ]
+    }
+  }
+}
+```
+
 ### 专业领域配置
+
+系统支持针对特定专业领域的优化配置：
+
 ```json
 {
   "professional_domains": {
+    "enabled": true,
+    "default_domain": "semiconductor",
     "semiconductor": {
-      "keywords": ["IGZO", "TFT", "OLED", "半导体"],
+      "keywords": ["IGZO", "TFT", "OLED", "半导体", "晶体管"],
       "quality_criteria": "high",
       "specific_checks": ["technical_accuracy", "formula_validity"]
-    },
-    "optics": {
-      "keywords": ["光谱", "光学", "激光", "折射"],
-      "quality_criteria": "high",
-      "specific_checks": ["wavelength_accuracy", "optical_principles"]
     }
   }
 }
 ```
 
-## 📖 详细使用指南
+## 使用示例
 
-### 多模态处理
-系统支持从PDF文档中提取文本和图像，并基于图文内容生成问答对：
-
-```bash
-# 启用多模态处理
-python run_pipeline.py \
-    --mode full_pipeline \
-    --input_path data/pdfs/research_papers \
-    --enable_multimodal \
-    --domain semiconductor
-```
-
-**多模态输出示例**：
-```json
-{
-  "question": "根据图中的I-V特性曲线，判断该器件的类型",
-  "answer": "根据曲线的非线性特征和阈值电压，这是一个场效应晶体管",
-  "choices": ["二极管", "三极管", "场效应管", "电阻"],
-  "reasoning": "从I-V曲线可以看出明显的阈值电压特征...",
-  "image_path": "./data/images/iv_curve.png",
-  "context": "该图显示了半导体器件的电流-电压特性..."
-}
-```
-
-### 本地模型使用
-
-#### Ollama集成
-```bash
-# 1. 安装并启动Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-ollama serve
-
-# 2. 下载模型
-ollama pull qwen:7b
-ollama pull llama2
-
-# 3. 配置使用本地模型
-python run_pipeline.py \
-    --use_local_models \
-    --input_path data/pdfs \
-    --domain semiconductor
-```
-
-#### 模型选择优先级
-系统支持智能模型选择，优先级顺序：
-1. Ollama（如果启用且可用）
-2. vLLM（如果启用且可用）
-3. Transformers（如果启用且可用）
-4. 云端API（默认备选）
-
-### 质量控制系统
-
-#### 增强质量检查
-```bash
-# 启用增强质量检查
-python run_pipeline.py \
-    --mode quality_control \
-    --input_path data/qa_results/results_343.json \
-    --quality_threshold 0.8
-```
-
-**质量检查维度**：
-- **推理有效性**：检查推理逻辑是否合理
-- **问题清晰度**：评估问题表述是否清晰
-- **答案正确性**：验证答案的准确性
-- **图片依赖性**：检查是否正确依赖图片内容
-- **领域相关性**：验证内容是否符合专业领域要求
-
-#### 质量报告示例
-```json
-{
-  "pipeline_summary": {
-    "total_qa_pairs_generated": 150,
-    "quality_pass_rate": 0.85,
-    "execution_time": 1200.5
-  },
-  "quality_breakdown": {
-    "reasoning_validity": 0.90,
-    "question_clarity": 0.88,
-    "answer_correctness": 0.82,
-    "image_dependency": 0.85,
-    "domain_relevance": 0.92
-  }
-}
-```
-
-## 🔧 高级功能
-
-### 1. 批量处理脚本
-
-创建自定义批量处理脚本：
-```bash
-#!/bin/bash
-# batch_process_domains.sh
-
-DOMAINS=("semiconductor" "optics" "materials")
-INPUT_BASE="data/pdfs"
-
-for domain in "${DOMAINS[@]}"; do
-    echo "Processing domain: $domain"
-    python run_pipeline.py \
-        --mode full_pipeline \
-        --input_path "$INPUT_BASE/$domain" \
-        --domain "$domain" \
-        --quality_threshold 0.7 \
-        --batch_size 50
-done
-```
-
-### 2. 自定义Prompt开发
-
-在 `TextGeneration/prompts_conf.py` 中添加自定义prompt：
+### 示例1: 处理PDF文档
 ```python
-# 添加新的专业领域prompt
-user_prompts[999] = """
-你是一个{domain}领域的专家，请基于以下内容生成高质量的问答对：
+from run_pipeline import IntegratedQAPipeline
 
-内容：{content}
+# 初始化流水线
+pipeline = IntegratedQAPipeline("config.json")
 
-要求：
-1. 生成3-5个不同难度的问题
-2. 每个问题都要有详细的推理过程
-3. 确保答案准确且专业
-4. 如果有图片，要充分利用图片信息
+# 运行完整流程
+results = pipeline.run_pipeline(
+    input_dir="data/pdfs",
+    stages=["text_retrieval", "qa_generation", "quality_control"]
+)
 
-请按照以下JSON格式输出：
-{{
-  "qa_pairs": [
-    {{
-      "question": "问题内容",
-      "answer": "答案内容", 
-      "reasoning": "推理过程",
-      "difficulty": "easy/medium/hard",
-      "question_type": "factual/reasoning/application"
-    }}
-  ]
-}}
-"""
+print(f"生成了 {results['total_qa_pairs']} 个QA对")
 ```
 
-### 3. 性能监控和优化
+### 示例2: 使用本地模型
+```python
+from LocalModels import LocalModelManager
+
+# 加载配置
+config = json.load(open("config.json"))
+
+# 初始化本地模型管理器
+model_manager = LocalModelManager(config)
+
+# 生成文本
+response = await model_manager.generate(
+    prompt="解释什么是半导体",
+    temperature=0.7,
+    max_tokens=1024
+)
+```
+
+### 示例3: 批量处理文本文件
+```python
+from TextGeneration.Datageneration import process_folder_async
+
+# 处理整个文件夹
+results = await process_folder_async(
+    folder_path="data/texts",
+    prompt_index=43,  # 使用特定的提示模板
+    max_concurrent=10,  # 并发处理10个文件
+    config=config
+)
+```
+
+## API文档
+
+### 主要类和函数
+
+#### IntegratedQAPipeline
+主流水线类，协调整个处理流程。
 
 ```python
-# performance_monitor.py
-import psutil
-import json
-from datetime import datetime
+class IntegratedQAPipeline:
+    def __init__(self, config_path: str = "config.json"):
+        """初始化流水线"""
+        
+    def run_pipeline(self, input_dir: str = None, stages: List[str] = None):
+        """运行指定的流水线阶段"""
+        
+    def run_single_stage(self, stage: str):
+        """运行单个阶段"""
+```
 
-def monitor_system_performance():
-    """监控系统性能"""
-    stats = {
-        'timestamp': datetime.now().isoformat(),
-        'cpu_usage': psutil.cpu_percent(interval=1),
-        'memory_usage': psutil.virtual_memory().percent,
-        'disk_usage': psutil.disk_usage('/').percent,
-        'network_io': psutil.net_io_counters()._asdict()
-    }
+#### LocalModelManager
+本地模型管理器，统一管理不同的模型后端。
+
+```python
+class LocalModelManager:
+    def __init__(self, config: Dict):
+        """初始化模型管理器"""
+        
+    async def generate(self, prompt: str, **kwargs) -> str:
+        """生成文本"""
+        
+    def is_available(self) -> bool:
+        """检查模型是否可用"""
+```
+
+#### 文本处理函数
+```python
+async def parse_txt(file_path: str, index: int = 9, config: Dict = None):
+    """解析文本文件并创建处理任务"""
     
-    with open('logs/performance.json', 'a') as f:
-        json.dump(stats, f)
-        f.write('\n')
+async def input_text_process(text_content: str, source_file: str, **kwargs):
+    """处理文本内容并生成QA"""
 ```
 
-## 📊 输出格式
-
-### 召回阶段输出
-```json
-{
-  "content": "模型返回的原始内容...",
-  "image_path": "/path/to/image.png",
-  "metadata": {
-    "page": 1,
-    "confidence": 0.95,
-    "processing_time": 2.3
-  }
-}
-```
-
-### 清理后输出
-```json
-{
-  "imageDescription": "图片描述内容...",
-  "analysisResults": "分析结果...",
-  "relatedKnowledge": "相关知识...",
-  "image_path": "./data/images/sample.png",
-  "cleaned_at": "2024-12-20T10:30:00"
-}
-```
-
-### 最终QA输出
-```json
-{
-  "metadata": {
-    "system_name": "智能文本QA生成系统 - 整合版",
-    "version": "2.0.0",
-    "domain": "semiconductor",
-    "generation_time": "20241220_103000",
-    "total_qa_pairs": 150,
-    "quality_pass_rate": 0.85
-  },
-  "qa_pairs": [
-    {
-      "question": "什么是IGZO材料的主要优势？",
-      "answer": "IGZO材料具有高迁移率、低功耗和良好的均匀性...",
-      "choices": ["选项A", "选项B", "选项C", "选项D"],
-      "reasoning": "基于IGZO材料的物理特性分析...",
-      "context": "IGZO是铟镓锌氧化物的缩写...",
-      "quality_score": 0.85,
-      "domain": "semiconductor",
-      "source_file": "igzo_research.pdf",
-      "question_type": "factual",
-      "difficulty": "intermediate"
-    }
-  ],
-  "pipeline_stats": {
-    "total_duration": 1200.5,
-    "stages_completed": ["text_retrieval", "data_cleaning", "qa_generation", "quality_control", "final_processing"]
-  }
-}
-```
-
-## 🛠️ 故障排除
+## 故障排除
 
 ### 常见问题
 
-#### 1. 本地模型连接失败
-```bash
-# 检查Ollama服务状态
-ollama list
+#### 1. 本地模型加载失败
+**错误信息**: `Connection error` 或 `Local models not available`
 
-# 重启Ollama服务
-pkill ollama
-ollama serve
+**解决方案**:
+- 检查模型路径是否正确
+- 确认vLLM服务是否启动
+- 验证GPU驱动和CUDA版本
+- 检查内存是否充足
 
-# 检查模型是否已下载
-ollama pull qwen:7b
-```
+#### 2. PDF提取失败
+**错误信息**: `所有PDF提取方法失败`
 
-#### 2. 内存不足
-```bash
-# 减少批处理大小
-python run_pipeline.py --batch_size 20
+**解决方案**:
+- 安装所需的PDF处理库: `pip install pymupdf pdfplumber pypdf2`
+- 检查PDF文件是否损坏
+- 尝试不同的提取引擎
 
-# 启用内存优化
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-```
+#### 3. API连接超时
+**错误信息**: `Connection timeout`
 
-#### 3. API调用失败
-```bash
-# 检查网络连接
-curl -I http://your-api-endpoint/v1
+**解决方案**:
+- 增加timeout配置值
+- 检查网络连接
+- 启用本地模型作为备选
 
-# 验证API密钥
-python -c "
-import json
-with open('config.json') as f:
-    config = json.load(f)
-print('API Key:', config['api']['api_key'][:10] + '...')
-"
-```
+### 性能优化建议
 
-#### 4. 多模态处理错误
-```bash
-# 检查图像处理依赖
-pip install PyMuPDF Pillow opencv-python
+1. **批处理优化**
+   - 根据系统内存调整batch_size
+   - 使用适当的max_concurrent值避免过载
 
-# 检查PDF文件完整性
-python -c "
-import fitz
-doc = fitz.open('your_file.pdf')
-print(f'Pages: {len(doc)}')
-doc.close()
-"
-```
+2. **模型选择**
+   - 大文档使用vLLM获得最佳性能
+   - 小批量处理可以使用Transformers
+   - 快速原型使用Ollama
 
-### 性能优化
+3. **内存管理**
+   - 启用内存限制和垃圾回收
+   - 使用量化技术减少模型内存占用
 
-#### 硬件建议
-- **CPU**: 8核心以上（推荐16核心）
-- **内存**: 32GB以上（大批量处理需要64GB）
-- **GPU**: NVIDIA GPU with 8GB+ VRAM（本地模型推荐）
-- **存储**: NVMe SSD，至少200GB可用空间
+## 开发指南
 
-#### 配置优化
-```json
-{
-  "performance": {
-    "multiprocessing": {
-      "enabled": true,
-      "max_workers": 8
-    },
-    "memory_optimization": {
-      "max_cache_size": "4GB",
-      "clear_cache_interval": 50
-    }
-  }
-}
-```
+### 添加新的模型后端
+1. 在`LocalModels`目录创建新的客户端类
+2. 实现统一的接口方法（generate、generate_stream等）
+3. 在LocalModelManager中注册新后端
+4. 更新配置文件模板
 
-## 📈 系统架构
+### 添加新的专业领域
+1. 在config.json中添加领域配置
+2. 创建领域特定的提示模板
+3. 实现领域特定的质量检查逻辑
+4. 更新文档
 
-### 数据流程图
-```
-PDF文档 → 文本召回 → 数据清理 → QA生成 → 质量控制 → 最终输出
-    ↓         ↓         ↓        ↓        ↓         ↓
-  图像提取   结构化    格式统一   多模态    质量评分   报告生成
-             数据      JSON     问答对    改进建议   统计分析
-```
+## 更新日志
 
-### 模块交互
-```
-run_pipeline.py (主控制器)
-    ├── TextQA/ (QA处理)
-    ├── TextGeneration/ (文本生成)  
-    ├── LocalModels/ (本地模型)
-    ├── MultiModal/ (多模态)
-    └── 各领域模块/ (Doubao, Qwen, etc.)
-```
+### v2.0.0 (2024-12-20)
+- ✨ 新增本地模型支持（vLLM、Transformers、Ollama）
+- 🔧 优化配置系统，支持动态模型切换
+- 📈 提升批处理性能
+- 🐛 修复PDF提取相关问题
+- 📚 完善文档和示例
 
-## 🤝 贡献指南
+### v1.0.0 (2024-12-01)
+- 🎉 初始版本发布
+- 基础QA生成功能
+- 支持PDF和文本文件
+- 简单的质量控制
 
-### 开发环境设置
-```bash
-# 克隆开发分支
-git clone -b develop <repository-url>
+## 许可证
+[添加许可证信息]
 
-# 安装开发依赖
-pip install -r requirements.txt
-pip install pytest black flake8 mypy
+## 贡献指南
+欢迎提交Issue和Pull Request！
 
-# 运行测试
-python -m pytest tests/ -v
-
-# 代码格式化
-black . --line-length 100
-flake8 . --max-line-length 100
-```
-
-### 添加新功能
-1. **新增专业领域**：在 `config.json` 中添加领域配置
-2. **新增模型支持**：在 `LocalModels/` 中创建客户端
-3. **新增质量检查**：在 `TextQA/enhanced_quality_checker.py` 中扩展
-4. **新增Prompt模板**：在 `TextGeneration/prompts_conf.py` 中添加
-
-### 提交规范
-- feat: 新功能
-- fix: 错误修复  
-- docs: 文档更新
-- refactor: 代码重构
-- test: 测试相关
-- perf: 性能优化
-
-## 📄 许可证
-
-本项目采用MIT许可证，详见LICENSE文件。
-
-## 🙏 致谢
-
-感谢以下技术和项目的支持：
-- [豆包大模型](https://www.volcengine.com/product/doubao) - 核心AI能力
-- [Qwen](https://github.com/QwenLM/Qwen) - 文本生成模型
-- [Ollama](https://ollama.ai/) - 本地大模型服务
-- [vLLM](https://github.com/vllm-project/vllm) - 高性能推理
-- [PyMuPDF](https://pymupdf.readthedocs.io/) - PDF处理
-- [Transformers](https://huggingface.co/transformers/) - 模型库
-
----
-
-## 🚀 整合完成确认
-
-### ✅ 已整合功能
-- [x] **文本召回与检索** - 从PDF文档智能提取相关内容
-- [x] **数据清理与预处理** - 正则表达式和AI清理技术
-- [x] **智能QA生成** - 基于36+专业Prompt模板生成高质量问答
-- [x] **增强质量控制** - 多维度质量检查和自动改进
-- [x] **多模态处理** - PDF图文结合，支持图像分析问答
-- [x] **本地模型支持** - Ollama、vLLM、Transformers集成
-- [x] **专业领域定制** - 半导体、光学、材料科学等领域特化
-- [x] **高性能处理** - 异步批处理、多进程架构、内存优化
-- [x] **完整配置系统** - 统一配置文件支持所有功能
-- [x] **统一流水线** - 一键运行完整处理流程
-
-### 🎯 核心优势
-1. **功能完整性** - 涵盖从原始PDF到最终QA对的完整流程
-2. **技术先进性** - 整合最新的AI技术和本地模型支持
-3. **专业领域深度** - 针对半导体、光学等专业领域深度优化
-4. **部署灵活性** - 支持云端、本地、混合部署方案
-5. **质量保证** - 多层次质量控制确保输出质量
-6. **易用性** - 一键运行，配置简单，文档完善
-
-**让AI助力专业知识的智能问答生成！** 🚀
-
-如有问题或建议，请提交Issue或联系项目维护者。
+## 联系方式
+[添加联系信息]

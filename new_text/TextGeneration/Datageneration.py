@@ -23,10 +23,10 @@ except ImportError:
 try:
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from LocalModels.ollama_client import OllamaClient
-    LOCAL_MODEL_AVAILABLE = True
+    from LocalModels.local_model_manager import LocalModelManager
+    LOCAL_MODEL_SUPPORT = True
 except ImportError:
-    LOCAL_MODEL_AVAILABLE = False
+    LOCAL_MODEL_SUPPORT = False
     print("Warning: Local model support not available")
 
 from .prompts_conf import system_prompt, user_prompts
@@ -86,9 +86,10 @@ def extract_text_chunks(text_content, chunk_size=2000, overlap=200):
     return chunks
 
 
-async def parse_txt(file_path, index=9):
+async def parse_txt(file_path, index=9, config=None):
     """
     Parse txt file and create tasks for processing.
+    Now supports passing config for local model support.
     """
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -112,162 +113,93 @@ async def parse_txt(file_path, index=9):
             os.path.basename(file_path),
             chunk_index=i,
             total_chunks=len(chunks),
-            prompt_index=index
+            prompt_index=index,
+            config=config
         )
         tasks.append(task)
     
     return tasks
 
 
-async def input_text_process(text_content, source_file, chunk_index=0, total_chunks=1, prompt_index=9):
+async def input_text_process(text_content, source_file, chunk_index=0, total_chunks=1, prompt_index=9, config=None):
     """
     Process text content using the specified prompt.
+    Supports both API and local model backends.
     """
-    # Check if we should use mock mode
-    use_mock = os.environ.get('USE_MOCK_API', 'false').lower() == 'true'
-    
-    if use_mock:
-        # Return mock data for testing
-        logger.warning("Using mock mode for text processing")
-        result = {
-            "content": f"Mock QA for {source_file} chunk {chunk_index + 1}/{total_chunks}:\nQ: What is discussed in this text?\nA: The text discusses semiconductor technology and related concepts.",
-            "source_file": source_file,
-            "chunk_index": chunk_index,
-            "total_chunks": total_chunks,
-            "text_content": text_content[:500] + "..." if len(text_content) > 500 else text_content,
-            "qa_pairs": [
-                {
-                    "question": "What is the main topic of this text?",
-                    "answer": "The text discusses semiconductor technology.",
-                    "reasoning": "Based on the content analysis."
-                }
-            ]
-        }
-        return result
-    
     # Check if we should use local models
-    if use_local_models and LOCAL_MODEL_AVAILABLE:
-        logger.info("Using local model for text processing")
-        try:
-            ollama_client = OllamaClient(
-                base_url=local_model_config.get('base_url', 'http://localhost:11434'),
-                model_name=local_model_config.get('model_name', 'qwen:7b'),
-                timeout=local_model_config.get('timeout', 300)
-            )
-            
-            # Check if Ollama is available
-            if not ollama_client.check_connection():
-                logger.error("Cannot connect to Ollama service")
-                raise Exception("Ollama service not available")
-            
-            # Use local model for generation
-            user_prompt = user_prompts[prompt_index]
-            
-            # Format the prompt
-            if '{markdown_content}' in user_prompt:
-                formatted_prompt = user_prompt.format(
-                    markdown_content=text_content,
-                    source_file=source_file,
-                    chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
-                )
-            elif '{text_content}' in user_prompt:
-                formatted_prompt = user_prompt.format(
-                    text_content=text_content,
-                    source_file=source_file,
-                    chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
-                )
-            else:
-                formatted_prompt = user_prompt
-            
-            # Create messages for chat
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": formatted_prompt}
-            ]
-            
-            # Generate response using Ollama
-            response_content = await ollama_client.chat(messages, temperature=0.8, max_tokens=4096)
-            
-            if response_content:
-                result = {
-                    "content": response_content,
-                    "source_file": source_file,
-                    "chunk_index": chunk_index,
-                    "total_chunks": total_chunks,
-                    "text_content": text_content[:500] + "..." if len(text_content) > 500 else text_content,
-                    "model_used": "ollama/" + local_model_config.get('model_name', 'qwen:7b')
-                }
-                logger.info(f"Successfully processed chunk {chunk_index + 1}/{total_chunks} from {source_file} using local model")
-                return result
-            else:
-                logger.error("Failed to get response from local model")
-                raise Exception("No response from local model")
-                
-        except Exception as e:
-            logger.error(f"Error using local model: {e}")
-            logger.info("Falling back to API model")
-            # Fall through to use API model
+    use_local = False
+    local_model_manager = None
     
-    # Use API model (original logic)
-    if not OPENAI_AVAILABLE:
-        logger.error("OpenAI library not available and local models not configured")
-        return None
-    
-    try:
-        client = AsyncOpenAI(
-            api_key=api_key,
-            base_url=ark_url
-        )
-    except Exception as e:
-        logger.error(f"Failed to create OpenAI client: {e}")
-        # Return mock data if client creation fails
-        return {
-            "content": f"Error creating client, returning mock data for {source_file}",
-            "source_file": source_file,
-            "chunk_index": chunk_index,
-            "total_chunks": total_chunks,
-            "text_content": text_content[:500] + "..." if len(text_content) > 500 else text_content
-        }
+    if config and LOCAL_MODEL_SUPPORT:
+        use_local = config.get('api', {}).get('use_local_models', False)
+        if use_local:
+            try:
+                local_model_manager = LocalModelManager(config)
+                if not local_model_manager.is_available():
+                    logger.warning("Local models enabled but not available, falling back to API")
+                    use_local = False
+            except Exception as e:
+                logger.error(f"Failed to initialize local model manager: {e}")
+                use_local = False
     
     try:
         user_prompt = user_prompts[prompt_index]
         
         # Format the prompt with the text content
-        # Check if the prompt expects markdown_content or text_content
-        if '{markdown_content}' in user_prompt:
-            formatted_prompt = user_prompt.format(
-                markdown_content=text_content,
-                source_file=source_file,
-                chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
-            )
-        elif '{text_content}' in user_prompt:
-            formatted_prompt = user_prompt.format(
-                text_content=text_content,
-                source_file=source_file,
-                chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
-            )
-        else:
-            # For prompts that don't have placeholders, just use the prompt as is
-            formatted_prompt = user_prompt
-        
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user", 
-                    "content": formatted_prompt
-                }
-            ],
-            temperature=0.8,
-            max_tokens=4096,
-            top_p=0.9,
+        formatted_prompt = user_prompt.format(
+            text_content=text_content,
+            source_file=source_file,
+            chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
         )
         
-        content = response.choices[0].message.content
+        # Generate response using appropriate backend
+        if use_local and local_model_manager:
+            # Use local model
+            logger.info(f"Using local model backend: {local_model_manager.get_backend_name()}")
+            content = await local_model_manager.generate(
+                prompt=formatted_prompt,
+                system_prompt=system_prompt,
+                temperature=config.get('models', {}).get('qa_generator_model', {}).get('temperature', 0.8),
+                max_tokens=config.get('models', {}).get('qa_generator_model', {}).get('max_tokens', 4096),
+                top_p=config.get('models', {}).get('qa_generator_model', {}).get('top_p', 0.9)
+            )
+        else:
+            # Use API backend (original code)
+            if not config:
+                # Use default API configuration
+                ark_url = "http://0.0.0.0:8080/v1"
+                api_key = "ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b"
+                model = "/mnt/storage/models/Skywork/Skywork-R1V3-38B"
+            else:
+                # Use configuration from config
+                api_config = config.get('api', {})
+                ark_url = api_config.get('ark_url', "http://0.0.0.0:8080/v1")
+                api_key = api_config.get('api_key', "ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b")
+                model = config.get('models', {}).get('default_model', "/mnt/storage/models/Skywork/Skywork-R1V3-38B")
+            
+            client = AsyncOpenAI(
+                api_key=api_key,
+                base_url=ark_url
+            )
+            
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                    },
+                    {
+                        "role": "user", 
+                        "content": formatted_prompt
+                    }
+                ],
+                temperature=0.8,
+                max_tokens=4096,
+                top_p=0.9,
+            )
+            
+            content = response.choices[0].message.content
         
         # Structure the response
         result = {
@@ -327,7 +259,7 @@ def merge_chunk_responses(responses):
     return merged_responses
 
 
-async def process_folder_async(folder_path, prompt_index=9, max_concurrent=5):
+async def process_folder_async(folder_path, prompt_index=9, max_concurrent=5, config=None):
     """
     异步处理文件夹中的所有文本文件
     """
@@ -339,7 +271,7 @@ async def process_folder_async(folder_path, prompt_index=9, max_concurrent=5):
             if file.endswith('.txt'):
                 file_path = os.path.join(root, file)
                 # 使用parse_txt处理文件
-                file_tasks = await parse_txt(file_path, prompt_index)
+                file_tasks = await parse_txt(file_path, prompt_index, config)
                 tasks.extend(file_tasks)
     
     # 限制并发数量
@@ -357,7 +289,7 @@ async def process_folder_async(folder_path, prompt_index=9, max_concurrent=5):
     return results
 
 
-async def process_folder_async_with_history(folder_path, history_file=None, prompt_index=9, max_concurrent=5):
+async def process_folder_async_with_history(folder_path, history_file=None, prompt_index=9, max_concurrent=5, config=None):
     """
     异步处理文件夹中的文本文件，支持历史记录
     """
@@ -383,7 +315,7 @@ async def process_folder_async_with_history(folder_path, history_file=None, prom
             if file.endswith('.txt') and file not in processed_files:
                 file_path = os.path.join(root, file)
                 # 使用parse_txt处理文件
-                file_tasks = await parse_txt(file_path, prompt_index)
+                file_tasks = await parse_txt(file_path, prompt_index, config)
                 tasks.extend(file_tasks)
     
     logger.info(f"Found {len(tasks)} new tasks to process")

@@ -8,10 +8,12 @@ from .prompts_conf import system_prompt, user_prompts
 import asyncio
 import json
 
-# API configuration
-ark_url = "http://0.0.0.0:8080/v1"
-api_key = "ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b"
-model = "/mnt/storage/models/Skywork/Skywork-R1V3-38B"
+# Import local model support
+try:
+    from LocalModels.local_model_manager import LocalModelManager
+    LOCAL_MODEL_SUPPORT = True
+except ImportError:
+    LOCAL_MODEL_SUPPORT = False
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -52,7 +54,7 @@ def extract_text_chunks(text_content, chunk_size=2000, overlap=200):
     return chunks
 
 
-async def parse_txt(file_path, index=9):
+async def parse_txt(file_path, index=9, config=None):
     """
     Parse txt file and create tasks for processing.
     """
@@ -78,21 +80,34 @@ async def parse_txt(file_path, index=9):
             os.path.basename(file_path),
             chunk_index=i,
             total_chunks=len(chunks),
-            prompt_index=index
+            prompt_index=index,
+            config=config
         )
         tasks.append(task)
     
     return tasks
 
 
-async def input_text_process(text_content, source_file, chunk_index=0, total_chunks=1, prompt_index=9):
+async def input_text_process(text_content, source_file, chunk_index=0, total_chunks=1, prompt_index=9, config=None):
     """
     Process text content using the specified prompt.
+    Supports both API and local model backends.
     """
-    client = AsyncOpenAI(
-        api_key=api_key,
-        base_url=ark_url
-    )
+    # Check if we should use local models
+    use_local = False
+    local_model_manager = None
+    
+    if config and LOCAL_MODEL_SUPPORT:
+        use_local = config.get('api', {}).get('use_local_models', False)
+        if use_local:
+            try:
+                local_model_manager = LocalModelManager(config)
+                if not local_model_manager.is_available():
+                    logger.warning("Local models enabled but not available, falling back to API")
+                    use_local = False
+            except Exception as e:
+                logger.error(f"Failed to initialize local model manager: {e}")
+                use_local = False
     
     try:
         user_prompt = user_prompts[prompt_index]
@@ -104,24 +119,54 @@ async def input_text_process(text_content, source_file, chunk_index=0, total_chu
             chunk_info=f"(Chunk {chunk_index + 1}/{total_chunks})" if total_chunks > 1 else ""
         )
         
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user", 
-                    "content": formatted_prompt
-                }
-            ],
-            temperature=0.8,
-            max_tokens=4096,
-            top_p=0.9,
-        )
-        
-        content = response.choices[0].message.content
+        # Generate response using appropriate backend
+        if use_local and local_model_manager:
+            # Use local model
+            logger.info(f"Using local model backend: {local_model_manager.get_backend_name()}")
+            content = await local_model_manager.generate(
+                prompt=formatted_prompt,
+                system_prompt=system_prompt,
+                temperature=config.get('models', {}).get('qa_generator_model', {}).get('temperature', 0.8),
+                max_tokens=config.get('models', {}).get('qa_generator_model', {}).get('max_tokens', 4096),
+                top_p=config.get('models', {}).get('qa_generator_model', {}).get('top_p', 0.9)
+            )
+        else:
+            # Use API backend (original code)
+            if not config:
+                # Use default API configuration
+                ark_url = "http://0.0.0.0:8080/v1"
+                api_key = "ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b"
+                model = "/mnt/storage/models/Skywork/Skywork-R1V3-38B"
+            else:
+                # Use configuration from config
+                api_config = config.get('api', {})
+                ark_url = api_config.get('ark_url', "http://0.0.0.0:8080/v1")
+                api_key = api_config.get('api_key', "ae37bba4-73be-4c22-b1a7-c6b1f5ec3a4b")
+                model = config.get('models', {}).get('default_model', "/mnt/storage/models/Skywork/Skywork-R1V3-38B")
+            
+            client = AsyncOpenAI(
+                api_key=api_key,
+                base_url=ark_url
+            )
+            
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                    },
+                    {
+                        "role": "user", 
+                        "content": formatted_prompt
+                    }
+                ],
+                temperature=0.8,
+                max_tokens=4096,
+                top_p=0.9,
+            )
+            
+            content = response.choices[0].message.content
         
         # Structure the response
         result = {
