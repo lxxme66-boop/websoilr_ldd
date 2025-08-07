@@ -21,8 +21,8 @@
     "timeout": 600,
     "max_retries": 3,
     "retry_delay": 1,
-    "use_local_models": false,
-    "local_model_priority": ["ollama", "vllm", "transformers"]
+    "use_local_models": true,
+    "local_model_priority": ["vllm", "transformers", "ollama"]
   },
   
   "models": {
@@ -47,18 +47,23 @@
         "models_available": ["llama2", "codellama", "mistral", "qwen", "deepseek-coder"]
       },
       "vllm": {
-        "enabled": false,
+        "enabled": true,
         "base_url": "http://localhost:8000",
-        "model_name": "Qwen/Qwen2-7B-Instruct",
-        "timeout": 300
+        "model_name": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
+        "timeout": 300,
+        "gpu_memory_utilization": 0.9,
+        "max_model_len": 32768,
+        "tensor_parallel_size": 1,
+        "port": 8000
       },
       "transformers": {
         "enabled": false,
-        "model_name": "Qwen/Qwen2-7B-Instruct",
+        "model_name": "/mnt/storage/models/Skywork/Skywork-R1V3-38B",
         "device": "auto",
         "torch_dtype": "auto",
         "load_in_4bit": false,
-        "load_in_8bit": false
+        "load_in_8bit": false,
+        "trust_remote_code": true
       }
     },
     "multimodal_models": {
